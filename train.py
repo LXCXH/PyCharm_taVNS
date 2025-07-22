@@ -60,7 +60,12 @@ class taVNSTrainer:
         self.adaptive_module = IndividualAdaptiveModule(model, learning_rate=1e-4)
         
         # 创建输出目录
-        self.output_dir = f"training_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # 确保Training_Outputs父目录存在
+        parent_dir = "Training_Outputs"
+        os.makedirs(parent_dir, exist_ok=True)
+        
+        # 在Training_Outputs下创建具体的训练输出目录
+        self.output_dir = os.path.join(parent_dir, f"training_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(self.output_dir, exist_ok=True)
     
     def train_epoch(self, train_loader):
