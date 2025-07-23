@@ -5,8 +5,8 @@ import numpy as np
 
 class taVNSNet(nn.Module):
     """
-    taVNS血糖预测模型
-    多任务学习架构：同时预测刺激参数和血糖序列
+    taVNS参数预测模型
+    根据血糖序列预测最优的taVNS刺激参数
     支持个体自适应学习
     """
     
@@ -46,7 +46,7 @@ class taVNSNet(nn.Module):
         # 个体嵌入层（用于适应不同个体）
         self.individual_embedding = nn.Embedding(num_individuals, hidden_dim // 4)
         
-        # 刺激参数预测头
+        # taVNS参数预测头
         self.param_head = nn.Sequential(
             nn.Linear(hidden_dim // 2 + hidden_dim // 4, hidden_dim // 4),
             nn.ReLU(),
@@ -55,17 +55,6 @@ class taVNSNet(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim // 8, param_dim),
             nn.Sigmoid()  # 确保参数在[0,1]范围内
-        )
-        
-        # 血糖预测头
-        # combined_features = features + stim_params = (hidden_dim//2 + hidden_dim//4) + param_dim
-        self.glucose_head = nn.Sequential(
-            nn.Linear(hidden_dim // 2 + hidden_dim // 4 + param_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout * 0.5),
-            nn.Linear(hidden_dim // 2, hidden_dim // 4),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 4, input_dim)
         )
         
         # 注意力机制（用于关注重要的时间点）
@@ -102,7 +91,6 @@ class taVNSNet(nn.Module):
             return_attention: 是否返回注意力权重
         Returns:
             stim_params: 预测的刺激参数 (batch_size, param_dim)
-            predicted_glucose: 预测的血糖序列 (batch_size, sequence_length)
             attention_weights: 注意力权重（可选）
         """
         batch_size = glucose_seq.size(0)
@@ -134,17 +122,13 @@ class taVNSNet(nn.Module):
             individual_emb = torch.zeros(batch_size, self.hidden_dim // 4, device=glucose_seq.device)
             features = torch.cat([features, individual_emb], dim=1)
         
-        # 预测刺激参数
+        # 预测taVNS刺激参数
         stim_params = self.param_head(features)  # (batch_size, param_dim)
         
-        # 预测血糖序列
-        combined_features = torch.cat([features, stim_params], dim=1)
-        predicted_glucose = self.glucose_head(combined_features)  # (batch_size, input_dim)
-        
         if return_attention:
-            return stim_params, predicted_glucose, attention_weights
+            return stim_params, attention_weights
         else:
-            return stim_params, predicted_glucose
+            return stim_params
     
     def get_individual_embedding(self, individual_id):
         """获取特定个体的嵌入向量"""
@@ -155,58 +139,31 @@ class taVNSNet(nn.Module):
         with torch.no_grad():
             self.individual_embedding.weight[individual_id] = new_embedding
 
-class AdaptiveLoss(nn.Module):
+class ParamPredictionLoss(nn.Module):
     """
-    自适应损失函数
-    结合刺激参数预测和血糖序列预测的损失
+    taVNS参数预测损失函数
     """
     
-    def __init__(self, param_weight=1.0, glucose_weight=2.0, 
-                 param_loss_type='mse', glucose_loss_type='mse'):
-        super(AdaptiveLoss, self).__init__()
+    def __init__(self, loss_type='mse'):
+        super(ParamPredictionLoss, self).__init__()
         
-        self.param_weight = param_weight
-        self.glucose_weight = glucose_weight
-        
-        # 刺激参数损失
-        if param_loss_type == 'mse':
-            self.param_criterion = nn.MSELoss()
-        elif param_loss_type == 'mae':
-            self.param_criterion = nn.L1Loss()
+        if loss_type == 'mse':
+            self.criterion = nn.MSELoss()
+        elif loss_type == 'mae':
+            self.criterion = nn.L1Loss()
         else:
-            raise ValueError(f"Unsupported param_loss_type: {param_loss_type}")
-        
-        # 血糖序列损失
-        if glucose_loss_type == 'mse':
-            self.glucose_criterion = nn.MSELoss()
-        elif glucose_loss_type == 'mae':
-            self.glucose_criterion = nn.L1Loss()
-        else:
-            raise ValueError(f"Unsupported glucose_loss_type: {glucose_loss_type}")
+            raise ValueError(f"Unsupported loss_type: {loss_type}")
     
-    def forward(self, pred_params, target_params, pred_glucose, target_glucose):
+    def forward(self, pred_params, target_params):
         """
-        计算总损失
+        计算参数预测损失
         Args:
             pred_params: 预测的刺激参数
             target_params: 目标刺激参数
-            pred_glucose: 预测的血糖序列
-            target_glucose: 目标血糖序列
         Returns:
-            total_loss: 总损失
-            param_loss: 参数预测损失
-            glucose_loss: 血糖预测损失
+            loss: 损失值
         """
-        # 计算参数预测损失
-        param_loss = self.param_criterion(pred_params, target_params)
-        
-        # 计算血糖序列预测损失
-        glucose_loss = self.glucose_criterion(pred_glucose, target_glucose)
-        
-        # 总损失
-        total_loss = self.param_weight * param_loss + self.glucose_weight * glucose_loss
-        
-        return total_loss, param_loss, glucose_loss
+        return self.criterion(pred_params, target_params)
 
 class IndividualAdaptiveModule:
     """
@@ -225,21 +182,19 @@ class IndividualAdaptiveModule:
         if individual_id not in self.individual_optimizers:
             # 只优化该个体的嵌入向量
             optimizer = torch.optim.Adam(
-                [self.model.individual_embedding.weight[individual_id]], 
+                [self.model.individual_embedding.weight[individual_id].clone().detach().requires_grad_(True)], 
                 lr=self.learning_rate
             )
             self.individual_optimizers[individual_id] = optimizer
             self.individual_histories[individual_id] = []
     
-    def adaptive_fine_tune(self, individual_id, input_glucose, target_params, 
-                          target_glucose, epochs=5):
+    def adaptive_fine_tune(self, individual_id, input_glucose, target_params, epochs=5):
         """
         对特定个体进行微调
         Args:
             individual_id: 个体ID
             input_glucose: 输入血糖序列
             target_params: 目标刺激参数
-            target_glucose: 目标血糖序列
             epochs: 微调轮数
         """
         # 创建个体优化器
@@ -247,30 +202,26 @@ class IndividualAdaptiveModule:
         optimizer = self.individual_optimizers[individual_id]
         
         # 损失函数
-        criterion = AdaptiveLoss()
+        criterion = ParamPredictionLoss()
         
         # 微调
         for epoch in range(epochs):
             optimizer.zero_grad()
             
             # 前向传播
-            pred_params, pred_glucose = self.model(input_glucose, individual_id)
+            pred_params = self.model(input_glucose, individual_id)
             
             # 计算损失
-            total_loss, param_loss, glucose_loss = criterion(
-                pred_params, target_params, pred_glucose, target_glucose
-            )
+            loss = criterion(pred_params, target_params)
             
             # 反向传播
-            total_loss.backward()
+            loss.backward()
             optimizer.step()
             
             # 记录历史
             self.individual_histories[individual_id].append({
                 'epoch': epoch,
-                'total_loss': total_loss.item(),
-                'param_loss': param_loss.item(),
-                'glucose_loss': glucose_loss.item()
+                'loss': loss.item()
             })
     
     def get_individual_performance(self, individual_id):
@@ -298,67 +249,49 @@ class ModelEvaluator:
         评估模型性能
         """
         model.eval()
-        total_param_loss = 0
-        total_glucose_loss = 0
+        total_loss = 0
         total_samples = 0
         
         param_predictions = []
         param_targets = []
-        glucose_predictions = []
-        glucose_targets = []
         
         with torch.no_grad():
             for batch in dataloader:
                 input_glucose = batch['input_glucose'].to(device)
                 target_params = batch['stim_params'].to(device)
-                target_glucose = batch['output_glucose'].to(device)
                 
                 # 预测
-                pred_params, pred_glucose = model(input_glucose)
+                pred_params = model(input_glucose)
                 
                 # 计算损失
-                param_loss = F.mse_loss(pred_params, target_params)
-                glucose_loss = F.mse_loss(pred_glucose, target_glucose)
+                loss = F.mse_loss(pred_params, target_params)
                 
-                total_param_loss += param_loss.item() * input_glucose.size(0)
-                total_glucose_loss += glucose_loss.item() * input_glucose.size(0)
+                total_loss += loss.item() * input_glucose.size(0)
                 total_samples += input_glucose.size(0)
                 
                 # 收集预测结果
                 param_predictions.append(pred_params.cpu().numpy())
                 param_targets.append(target_params.cpu().numpy())
-                glucose_predictions.append(pred_glucose.cpu().numpy())
-                glucose_targets.append(target_glucose.cpu().numpy())
         
         # 计算平均损失
-        avg_param_loss = total_param_loss / total_samples
-        avg_glucose_loss = total_glucose_loss / total_samples
+        avg_loss = total_loss / total_samples
         
         # 反标准化预测结果
         param_predictions = np.concatenate(param_predictions, axis=0)
         param_targets = np.concatenate(param_targets, axis=0)
-        glucose_predictions = np.concatenate(glucose_predictions, axis=0)
-        glucose_targets = np.concatenate(glucose_targets, axis=0)
         
         # 反标准化
         param_predictions_orig = self.data_processor.inverse_transform_params(param_predictions)
         param_targets_orig = self.data_processor.inverse_transform_params(param_targets)
-        glucose_predictions_orig = self.data_processor.inverse_transform_glucose(glucose_predictions)
-        glucose_targets_orig = self.data_processor.inverse_transform_glucose(glucose_targets)
         
         # 计算评估指标
         metrics = {
-            'param_mse': avg_param_loss,
-            'glucose_mse': avg_glucose_loss,
+            'param_mse': avg_loss,
             'param_mae': np.mean(np.abs(param_predictions_orig - param_targets_orig)),
-            'glucose_mae': np.mean(np.abs(glucose_predictions_orig - glucose_targets_orig)),
-            'param_rmse': np.sqrt(np.mean((param_predictions_orig - param_targets_orig) ** 2)),
-            'glucose_rmse': np.sqrt(np.mean((glucose_predictions_orig - glucose_targets_orig) ** 2))
+            'param_rmse': np.sqrt(np.mean((param_predictions_orig - param_targets_orig) ** 2))
         }
         
         return metrics, {
             'param_predictions': param_predictions_orig,
-            'param_targets': param_targets_orig,
-            'glucose_predictions': glucose_predictions_orig,
-            'glucose_targets': glucose_targets_orig
+            'param_targets': param_targets_orig
         } 

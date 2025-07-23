@@ -1,0 +1,45 @@
+{
+  "model_config": {
+    "input_dim": 12,
+    "param_dim": 5,
+    "hidden_dim": 128,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "num_individuals": 100
+  },
+  "training_config": {
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "batch_size": 16,
+    "epochs": 100,
+    "early_stopping_patience": 20,
+    "train_ratio": 0.8
+  },
+  "data_config": {
+    "target_sequence_length": 12,
+    "num_samples": 46,
+    "paper_summary": {
+      "paper1_zdf_mice": {
+        "study_duration": "5 weeks",
+        "stimulation": "2/15 Hz, 2mA, 30min",
+        "glucose_reduction": "From 18-28 to 10 mmol/L",
+        "sample_count": 21
+      },
+      "paper2_human_igt": {
+        "study_duration": "12 weeks",
+        "stimulation": "20 Hz, 1mA, 20min, 1ms pulse",
+        "glucose_reduction": "2hPG: 9.7\u21927.3 mmol/L",
+        "sample_count": 15
+      },
+      "paper3_healthy_postprandial": {
+        "study_duration": "Acute (single session)",
+        "stimulation": "10 Hz, 2.3mA, 30min, 0.3ms pulse",
+        "effect": "Postprandial glucose suppression",
+        "sample_count": 10
+      }
+    }
+  },
+  "training_completed": true,
+  "best_val_loss": 0.05285380408167839,
+  "final_epoch": 47
+}

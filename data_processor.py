@@ -10,6 +10,7 @@ class taVNSDataProcessor:
     """
     taVNS数据处理器
     基于三篇论文的实际实验数据重新构建
+    专门用于taVNS参数预测
     """
     
     def __init__(self, target_sequence_length=12):
@@ -21,10 +22,12 @@ class taVNSDataProcessor:
         self.paper1_data = {
             'study_type': 'ZDF_mice',
             'stimulation_params': {
-                'frequency': 2/15,  # 2/15 Hz (每秒交替)
-                'amplitude': 2.0,   # 2 mA
-                'duration': 30,     # 30分钟
-                'pulse_width': 200, # 假设值
+                'frequency_low': 2,    # 2 Hz
+                'frequency_high': 15,  # 15 Hz
+                'frequency_mode': 'alternating',  # 交替模式：每秒切换
+                'amplitude': 2.0,      # 2 mA
+                'duration': 30,        # 30分钟
+                'pulse_width': 200,    # 假设值
                 'session_duration': 5  # 持续5周
             },
             'baseline_glucose': {
@@ -93,6 +96,7 @@ class taVNSDataProcessor:
     def create_comprehensive_dataset_from_papers(self):
         """
         基于三篇论文的实际数据创建综合训练数据集
+        专门用于taVNS参数预测
         """
         samples = []
         
@@ -125,30 +129,37 @@ class taVNSDataProcessor:
             
             # 模拟1小时内的血糖变化（12个点，每5分钟）
             control_sequence = self._generate_hourly_sequence(base_control, 'high_variation')
-            treatment_sequence = self._generate_hourly_sequence(base_treatment, 'low_variation')
-            
-            # 刺激参数
-            stim_params = np.array([
-                data['stimulation_params']['frequency'],
-                data['stimulation_params']['amplitude'],
-                data['stimulation_params']['duration'],
-                data['stimulation_params']['pulse_width'],
-                data['stimulation_params']['session_duration']
-            ])
             
             # 添加个体差异
             for sensitivity in [0.8, 1.0, 1.2]:
-                # 调整刺激效果
-                adjusted_treatment = self._apply_sensitivity(treatment_sequence, sensitivity)
+                # 对于交替频率模式，使用专门的调整方法
+                avg_frequency, freq_low, freq_high = self._create_alternating_frequency_params(
+                    data['stimulation_params']['frequency_low'],
+                    data['stimulation_params']['frequency_high'],
+                    control_sequence, sensitivity
+                )
+                
+                # 构建刺激参数
+                stim_params = np.array([
+                    avg_frequency,  # 使用调整后的平均频率
+                    data['stimulation_params']['amplitude'],
+                    data['stimulation_params']['duration'],
+                    data['stimulation_params']['pulse_width'],
+                    data['stimulation_params']['session_duration']
+                ])
+                
+                # 进一步调整其他参数
+                adjusted_params = self._adjust_params_for_glucose_and_sensitivity(
+                    stim_params, control_sequence, sensitivity
+                )
                 
                 samples.append({
                     'input_glucose': control_sequence,
-                    'stim_params': stim_params,
-                    'output_glucose': adjusted_treatment,
+                    'stim_params': adjusted_params,
                     'individual_sensitivity': sensitivity,
                     'study_type': 'ZDF_mice',
                     'week': week,
-                    'stimulation_intensity': self._calculate_stimulation_intensity(stim_params)
+                    'stimulation_intensity': self._calculate_stimulation_intensity(adjusted_params)
                 })
         
         # 胰腺切除实验数据
@@ -157,17 +168,34 @@ class taVNSDataProcessor:
             # 扩展到12个点
             extended_sequence = self._extend_to_12_points(glucose_values)
             
-            # 模拟taVNS效果
-            treatment_effect = self._simulate_tavns_effect(extended_sequence, stim_params, 0.7)
+            # 对于交替频率模式，使用专门的调整方法
+            avg_frequency, freq_low, freq_high = self._create_alternating_frequency_params(
+                data['stimulation_params']['frequency_low'],
+                data['stimulation_params']['frequency_high'],
+                extended_sequence, 0.7
+            )
+            
+            # 构建刺激参数
+            stim_params = np.array([
+                avg_frequency,  # 使用调整后的平均频率
+                data['stimulation_params']['amplitude'],
+                data['stimulation_params']['duration'],
+                data['stimulation_params']['pulse_width'],
+                data['stimulation_params']['session_duration']
+            ])
+            
+            # 进一步调整其他参数
+            adjusted_params = self._adjust_params_for_glucose_and_sensitivity(
+                stim_params, extended_sequence, 0.7
+            )
             
             samples.append({
                 'input_glucose': extended_sequence,
-                'stim_params': stim_params,
-                'output_glucose': treatment_effect,
+                'stim_params': adjusted_params,
                 'individual_sensitivity': 0.7,  # 手术后敏感性降低
                 'study_type': 'ZDF_mice_pancreatic',
                 'day': day,
-                'stimulation_intensity': self._calculate_stimulation_intensity(stim_params)
+                'stimulation_intensity': self._calculate_stimulation_intensity(adjusted_params)
             })
         
         return samples
@@ -195,25 +223,25 @@ class taVNSDataProcessor:
         time_points = ['baseline', '6_weeks', '12_weeks']
         
         for time_point in time_points:
-            tavns_glucose = results[time_point]['ta_vns']
             sham_glucose = results[time_point]['sham']
             
             # 生成餐后血糖曲线
             sham_sequence = self._generate_postprandial_curve(sham_glucose, 'IGT_pattern')
-            tavns_sequence = self._generate_postprandial_curve(tavns_glucose, 'IGT_pattern')
             
             # 添加个体差异
             for sensitivity in [0.6, 0.8, 1.0, 1.2, 1.4]:
-                adjusted_tavns = self._apply_sensitivity(tavns_sequence, sensitivity)
+                # 根据血糖水平和个体敏感性调整刺激参数
+                adjusted_params = self._adjust_params_for_glucose_and_sensitivity(
+                    stim_params, sham_sequence, sensitivity
+                )
                 
                 samples.append({
                     'input_glucose': sham_sequence,
-                    'stim_params': stim_params,
-                    'output_glucose': adjusted_tavns,
+                    'stim_params': adjusted_params,
                     'individual_sensitivity': sensitivity,
                     'study_type': 'human_IGT',
                     'time_point': time_point,
-                    'stimulation_intensity': self._calculate_stimulation_intensity(stim_params)
+                    'stimulation_intensity': self._calculate_stimulation_intensity(adjusted_params)
                 })
         
         return samples
@@ -241,23 +269,104 @@ class taVNSDataProcessor:
             
             # 转换单位 mg/dL -> mmol/L
             sham_sequence = np.array(glucose_data['sham']) * 0.0555
-            tavns_sequence = np.array(glucose_data['tavns']) * 0.0555
             
             # 添加个体差异
             for sensitivity in [0.7, 0.9, 1.0, 1.1, 1.3]:
-                adjusted_tavns = self._apply_sensitivity(tavns_sequence, sensitivity)
+                # 根据血糖水平和个体敏感性调整刺激参数
+                adjusted_params = self._adjust_params_for_glucose_and_sensitivity(
+                    stim_params, sham_sequence, sensitivity
+                )
                 
                 samples.append({
                     'input_glucose': sham_sequence,
-                    'stim_params': stim_params,
-                    'output_glucose': adjusted_tavns,
+                    'stim_params': adjusted_params,
                     'individual_sensitivity': sensitivity,
                     'study_type': 'healthy_postprandial',
                     'protocol': protocol_name,
-                    'stimulation_intensity': self._calculate_stimulation_intensity(stim_params)
+                    'stimulation_intensity': self._calculate_stimulation_intensity(adjusted_params)
                 })
         
         return samples
+    
+    def _adjust_params_for_glucose_and_sensitivity(self, base_params, glucose_sequence, sensitivity):
+        """
+        根据血糖水平和个体敏感性调整刺激参数
+        """
+        # 计算血糖统计特征
+        mean_glucose = np.mean(glucose_sequence)
+        glucose_variance = np.var(glucose_sequence)
+        glucose_trend = np.polyfit(range(len(glucose_sequence)), glucose_sequence, 1)[0]
+        
+        # 复制基础参数
+        adjusted_params = base_params.copy()
+        
+        # 根据血糖水平调整频率
+        if mean_glucose > 15:  # 高血糖
+            adjusted_params[0] *= 1.2  # 增加频率
+        elif mean_glucose < 8:  # 低血糖
+            adjusted_params[0] *= 0.8  # 降低频率
+        
+        # 根据血糖变化趋势调整电流
+        if glucose_trend > 0.1:  # 血糖上升趋势
+            adjusted_params[1] *= 1.1  # 增加电流
+        elif glucose_trend < -0.1:  # 血糖下降趋势
+            adjusted_params[1] *= 0.9  # 降低电流
+        
+        # 根据血糖波动调整刺激时长
+        if glucose_variance > 5:  # 血糖波动大
+            adjusted_params[2] *= 1.15  # 增加刺激时长
+        else:
+            adjusted_params[2] *= 0.95  # 减少刺激时长
+        
+        # 根据个体敏感性调整脉宽
+        adjusted_params[3] *= sensitivity
+        
+        # 根据血糖水平调整治疗周期
+        if mean_glucose > 12:
+            adjusted_params[4] *= 1.2  # 增加治疗周期
+        elif mean_glucose < 6:
+            adjusted_params[4] *= 0.8  # 减少治疗周期
+        
+        return adjusted_params
+    
+    def _create_alternating_frequency_params(self, base_freq_low, base_freq_high, glucose_sequence, sensitivity):
+        """
+        创建交替频率刺激参数
+        根据血糖水平和个体敏感性调整2/15 Hz交替模式
+        """
+        # 计算血糖统计特征
+        mean_glucose = np.mean(glucose_sequence)
+        glucose_variance = np.var(glucose_sequence)
+        glucose_trend = np.polyfit(range(len(glucose_sequence)), glucose_sequence, 1)[0]
+        
+        # 基础交替频率参数
+        freq_low = base_freq_low
+        freq_high = base_freq_high
+        
+        # 根据血糖水平调整交替频率
+        if mean_glucose > 15:  # 高血糖 - 增加频率
+            freq_low *= 1.3
+            freq_high *= 1.3
+        elif mean_glucose < 8:  # 低血糖 - 降低频率
+            freq_low *= 0.7
+            freq_high *= 0.7
+        
+        # 根据血糖趋势微调
+        if glucose_trend > 0.1:  # 血糖上升趋势
+            freq_low *= 1.1
+            freq_high *= 1.1
+        elif glucose_trend < -0.1:  # 血糖下降趋势
+            freq_low *= 0.9
+            freq_high *= 0.9
+        
+        # 确保频率在合理范围内
+        freq_low = np.clip(freq_low, 0.5, 10.0)
+        freq_high = np.clip(freq_high, 5.0, 30.0)
+        
+        # 返回平均频率作为主要参数
+        avg_frequency = (freq_low + freq_high) / 2
+        
+        return avg_frequency, freq_low, freq_high
     
     def _generate_hourly_sequence(self, base_value, variation_type):
         """
@@ -316,41 +425,6 @@ class taVNSDataProcessor:
         
         return extended
     
-    def _simulate_tavns_effect(self, glucose_sequence, stim_params, sensitivity):
-        """
-        模拟taVNS对血糖的影响
-        """
-        # 计算刺激强度
-        intensity = self._calculate_stimulation_intensity(stim_params)
-        
-        # 血糖降低效应
-        reduction_factor = intensity * 0.1 * sensitivity
-        
-        # 应用时间依赖的效应
-        time_weights = np.linspace(0.5, 1.0, 12)  # 效应随时间增强
-        
-        treated_sequence = glucose_sequence.copy()
-        for i in range(12):
-            reduction = reduction_factor * time_weights[i] * (glucose_sequence[i] / 10.0)
-            treated_sequence[i] = glucose_sequence[i] - reduction
-        
-        return np.clip(treated_sequence, 3.0, 25.0)
-    
-    def _apply_sensitivity(self, sequence, sensitivity):
-        """
-        应用个体敏感性
-        """
-        # 计算平均效应
-        baseline = np.mean(sequence)
-        
-        # 调整序列
-        adjusted = sequence.copy()
-        for i in range(len(sequence)):
-            deviation = sequence[i] - baseline
-            adjusted[i] = baseline + deviation * sensitivity
-        
-        return np.clip(adjusted, 3.0, 25.0)
-    
     def _calculate_stimulation_intensity(self, stim_params):
         """
         计算刺激强度
@@ -386,7 +460,6 @@ class taVNSDataProcessor:
         for i, sample in enumerate(samples):
             sample['input_glucose_norm'] = normalized_glucose[i]
             sample['stim_params_norm'] = normalized_params[i]
-            sample['output_glucose_norm'] = self.glucose_scaler.transform([sample['output_glucose']])[0]
             
         return samples
     
@@ -409,7 +482,7 @@ class taVNSDataProcessor:
         summary = {
             'paper1_zdf_mice': {
                 'study_duration': '5 weeks',
-                'stimulation': '2/15 Hz, 2mA, 30min',
+                'stimulation': '2/15 Hz alternating (2Hz↔15Hz), 2mA, 30min',
                 'glucose_reduction': 'From 18-28 to 10 mmol/L',
                 'sample_count': len(self._create_zdf_mice_samples())
             },
@@ -432,6 +505,7 @@ class taVNSDataProcessor:
 class taVNSDataset(Dataset):
     """
     taVNS数据集
+    专门用于taVNS参数预测
     """
     
     def __init__(self, samples, sequence_length=12):
@@ -447,14 +521,12 @@ class taVNSDataset(Dataset):
         # 输入：血糖序列
         input_glucose = torch.FloatTensor(sample['input_glucose_norm'])
         
-        # 输出：刺激参数 + 预测血糖序列
+        # 输出：刺激参数
         stim_params = torch.FloatTensor(sample['stim_params_norm'])
-        output_glucose = torch.FloatTensor(sample['output_glucose_norm'])
         
         return {
             'input_glucose': input_glucose,
             'stim_params': stim_params,
-            'output_glucose': output_glucose,
             'individual_sensitivity': sample['individual_sensitivity'],
             'stimulation_intensity': sample['stimulation_intensity'],
             'study_type': sample['study_type']
