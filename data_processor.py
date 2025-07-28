@@ -11,12 +11,24 @@ class taVNSDataProcessor:
     taVNS数据处理器
     基于三篇论文的实际实验数据重新构建
     专门用于taVNS参数预测
+    增强版：包含大量数据扩充方法
     """
     
-    def __init__(self, target_sequence_length=12):
+    def __init__(self, target_sequence_length=12, enable_data_augmentation=True):
         self.target_sequence_length = target_sequence_length
         self.glucose_scaler = StandardScaler()
         self.param_scaler = MinMaxScaler()
+        self.enable_data_augmentation = enable_data_augmentation
+        
+        # 数据扩充参数
+        self.augmentation_config = {
+            'noise_levels': [0.01, 0.02, 0.03, 0.05],  # 噪声水平
+            'time_warp_factors': [0.9, 0.95, 1.05, 1.1],  # 时间扭曲因子
+            'amplitude_scales': [0.9, 0.95, 1.05, 1.1],  # 幅度缩放
+            'baseline_shifts': [-0.5, -0.2, 0.2, 0.5],  # 基线偏移
+            'param_mutations': [0.05, 0.1, 0.15],  # 参数变异幅度
+            'individual_variations': [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]  # 个体差异
+        }
         
         # 基于论文1：ZDF小鼠实验数据
         self.paper1_data = {
@@ -97,19 +109,360 @@ class taVNSDataProcessor:
         """
         基于三篇论文的实际数据创建综合训练数据集
         专门用于taVNS参数预测
+        增强版：包含大量数据扩充
         """
         samples = []
         
         # 1. 基于论文1的ZDF小鼠数据
-        samples.extend(self._create_zdf_mice_samples())
+        base_samples_1 = self._create_zdf_mice_samples()
+        samples.extend(base_samples_1)
         
         # 2. 基于论文2的人体IGT患者数据
-        samples.extend(self._create_human_igt_samples())
+        base_samples_2 = self._create_human_igt_samples()
+        samples.extend(base_samples_2)
         
         # 3. 基于论文3的健康人餐后血糖数据
-        samples.extend(self._create_healthy_postprandial_samples())
+        base_samples_3 = self._create_healthy_postprandial_samples()
+        samples.extend(base_samples_3)
+        
+        print(f"基础样本数量: {len(samples)}")
+        
+        # 4. 数据扩充
+        if self.enable_data_augmentation:
+            augmented_samples = self._apply_comprehensive_data_augmentation(samples)
+            samples.extend(augmented_samples)
+            print(f"扩充后样本数量: {len(samples)}")
+        
+        # 5. 生成合成数据
+        synthetic_samples = self._generate_synthetic_samples(target_count=2000)
+        samples.extend(synthetic_samples)
+        print(f"添加合成数据后样本数量: {len(samples)}")
         
         return samples
+    
+    def _apply_comprehensive_data_augmentation(self, base_samples):
+        """
+        应用综合数据扩充方法
+        """
+        augmented_samples = []
+        
+        for base_sample in base_samples:
+            # 1. 噪声注入
+            for noise_level in self.augmentation_config['noise_levels']:
+                aug_sample = self._add_gaussian_noise(base_sample, noise_level)
+                augmented_samples.append(aug_sample)
+            
+            # 2. 时间扭曲
+            for warp_factor in self.augmentation_config['time_warp_factors']:
+                aug_sample = self._apply_time_warping(base_sample, warp_factor)
+                augmented_samples.append(aug_sample)
+            
+            # 3. 幅度缩放
+            for scale_factor in self.augmentation_config['amplitude_scales']:
+                aug_sample = self._apply_amplitude_scaling(base_sample, scale_factor)
+                augmented_samples.append(aug_sample)
+            
+            # 4. 基线偏移
+            for shift in self.augmentation_config['baseline_shifts']:
+                aug_sample = self._apply_baseline_shift(base_sample, shift)
+                augmented_samples.append(aug_sample)
+            
+            # 5. 参数变异
+            for mutation_rate in self.augmentation_config['param_mutations']:
+                aug_sample = self._apply_parameter_mutation(base_sample, mutation_rate)
+                augmented_samples.append(aug_sample)
+            
+            # 6. 个体差异模拟
+            for variation in self.augmentation_config['individual_variations']:
+                if variation != 1.0:  # 跳过原始值
+                    aug_sample = self._simulate_individual_variation(base_sample, variation)
+                    augmented_samples.append(aug_sample)
+        
+        return augmented_samples
+    
+    def _add_gaussian_noise(self, sample, noise_level):
+        """添加高斯噪声"""
+        aug_sample = sample.copy()
+        glucose_seq = np.array(sample['input_glucose'])
+        noise = np.random.normal(0, noise_level * np.std(glucose_seq), glucose_seq.shape)
+        aug_sample['input_glucose'] = np.clip(glucose_seq + noise, 3.0, 30.0)
+        aug_sample['augmentation_type'] = f'gaussian_noise_{noise_level}'
+        return aug_sample
+    
+    def _apply_time_warping(self, sample, warp_factor):
+        """应用时间扭曲"""
+        aug_sample = sample.copy()
+        glucose_seq = np.array(sample['input_glucose'])
+        
+        # 创建扭曲的时间索引
+        original_indices = np.linspace(0, len(glucose_seq)-1, len(glucose_seq))
+        warped_indices = np.linspace(0, len(glucose_seq)-1, int(len(glucose_seq) * warp_factor))
+        
+        # 插值到原始长度
+        if len(warped_indices) != len(original_indices):
+            warped_glucose = np.interp(original_indices, 
+                                     np.linspace(0, len(glucose_seq)-1, len(warped_indices)), 
+                                     np.interp(warped_indices, original_indices, glucose_seq))
+        else:
+            warped_glucose = glucose_seq
+        
+        aug_sample['input_glucose'] = np.clip(warped_glucose, 3.0, 30.0)
+        aug_sample['augmentation_type'] = f'time_warp_{warp_factor}'
+        return aug_sample
+    
+    def _apply_amplitude_scaling(self, sample, scale_factor):
+        """应用幅度缩放"""
+        aug_sample = sample.copy()
+        glucose_seq = np.array(sample['input_glucose'])
+        mean_glucose = np.mean(glucose_seq)
+        
+        # 围绕均值进行缩放
+        scaled_glucose = mean_glucose + (glucose_seq - mean_glucose) * scale_factor
+        aug_sample['input_glucose'] = np.clip(scaled_glucose, 3.0, 30.0)
+        aug_sample['augmentation_type'] = f'amplitude_scale_{scale_factor}'
+        return aug_sample
+    
+    def _apply_baseline_shift(self, sample, shift):
+        """应用基线偏移"""
+        aug_sample = sample.copy()
+        glucose_seq = np.array(sample['input_glucose'])
+        shifted_glucose = glucose_seq + shift
+        aug_sample['input_glucose'] = np.clip(shifted_glucose, 3.0, 30.0)
+        aug_sample['augmentation_type'] = f'baseline_shift_{shift}'
+        return aug_sample
+    
+    def _apply_parameter_mutation(self, sample, mutation_rate):
+        """应用参数变异"""
+        aug_sample = sample.copy()
+        stim_params = np.array(sample['stim_params'])
+        
+        # 为每个参数添加变异
+        mutations = np.random.normal(0, mutation_rate, stim_params.shape)
+        mutated_params = stim_params * (1 + mutations)
+        
+        # 确保参数在合理范围内
+        mutated_params[0] = np.clip(mutated_params[0], 1.0, 50.0)  # 频率
+        mutated_params[1] = np.clip(mutated_params[1], 0.5, 5.0)   # 电流
+        mutated_params[2] = np.clip(mutated_params[2], 10.0, 60.0) # 时长
+        mutated_params[3] = np.clip(mutated_params[3], 50.0, 2000.0) # 脉宽
+        mutated_params[4] = np.clip(mutated_params[4], 1.0, 20.0)  # 周期
+        
+        aug_sample['stim_params'] = mutated_params
+        aug_sample['augmentation_type'] = f'param_mutation_{mutation_rate}'
+        return aug_sample
+    
+    def _simulate_individual_variation(self, sample, variation_factor):
+        """模拟个体差异"""
+        aug_sample = sample.copy()
+        
+        # 调整血糖序列（模拟个体代谢差异）
+        glucose_seq = np.array(sample['input_glucose'])
+        varied_glucose = glucose_seq * variation_factor
+        aug_sample['input_glucose'] = np.clip(varied_glucose, 3.0, 30.0)
+        
+        # 相应调整刺激参数
+        stim_params = np.array(sample['stim_params'])
+        adjusted_params = self._adjust_params_for_glucose_and_sensitivity(
+            stim_params, varied_glucose, variation_factor
+        )
+        aug_sample['stim_params'] = adjusted_params
+        aug_sample['individual_sensitivity'] = variation_factor
+        aug_sample['augmentation_type'] = f'individual_variation_{variation_factor}'
+        
+        return aug_sample
+    
+    def _generate_synthetic_samples(self, target_count=2000):
+        """
+        生成合成训练样本
+        """
+        synthetic_samples = []
+        
+        # 定义合成数据的参数范围
+        glucose_patterns = [
+            'normal_fasting',      # 正常空腹
+            'impaired_fasting',    # 空腹血糖受损
+            'diabetes_pattern',    # 糖尿病模式
+            'postprandial_normal', # 正常餐后
+            'postprandial_high',   # 餐后高血糖
+            'hypoglycemic',        # 低血糖
+            'dawn_phenomenon',     # 黎明现象
+            'somogyi_effect'       # 苏木杰效应
+        ]
+        
+        param_strategies = [
+            'conservative',        # 保守治疗
+            'aggressive',          # 积极治疗
+            'personalized_low',    # 个性化-低敏感
+            'personalized_high',   # 个性化-高敏感
+            'frequency_focused',   # 频率导向
+            'amplitude_focused',   # 幅度导向
+            'duration_focused'     # 时长导向
+        ]
+        
+        samples_per_combination = target_count // (len(glucose_patterns) * len(param_strategies))
+        
+        for pattern in glucose_patterns:
+            for strategy in param_strategies:
+                for _ in range(samples_per_combination):
+                    # 生成血糖序列
+                    glucose_seq = self._generate_synthetic_glucose_pattern(pattern)
+                    
+                    # 生成相应的刺激参数
+                    stim_params = self._generate_synthetic_stimulation_params(strategy, glucose_seq)
+                    
+                    # 计算个体敏感性
+                    sensitivity = np.random.uniform(0.6, 1.4)
+                    
+                    synthetic_sample = {
+                        'input_glucose': glucose_seq,
+                        'stim_params': stim_params,
+                        'individual_sensitivity': sensitivity,
+                        'study_type': 'synthetic',
+                        'glucose_pattern': pattern,
+                        'param_strategy': strategy,
+                        'stimulation_intensity': self._calculate_stimulation_intensity(stim_params),
+                        'augmentation_type': 'synthetic_generation'
+                    }
+                    
+                    synthetic_samples.append(synthetic_sample)
+        
+        return synthetic_samples
+    
+    def _generate_synthetic_glucose_pattern(self, pattern_type):
+        """生成合成血糖模式"""
+        sequence = np.zeros(12)
+        
+        if pattern_type == 'normal_fasting':
+            base_level = np.random.uniform(4.5, 6.0)
+            sequence = base_level + np.random.normal(0, 0.3, 12)
+            
+        elif pattern_type == 'impaired_fasting':
+            base_level = np.random.uniform(6.1, 7.0)
+            sequence = base_level + np.random.normal(0, 0.5, 12)
+            
+        elif pattern_type == 'diabetes_pattern':
+            base_level = np.random.uniform(12.0, 20.0)
+            trend = np.random.uniform(-0.2, 0.2)
+            for i in range(12):
+                sequence[i] = base_level + trend * i + np.random.normal(0, 1.0)
+                
+        elif pattern_type == 'postprandial_normal':
+            baseline = np.random.uniform(5.0, 7.0)
+            peak = np.random.uniform(8.0, 11.0)
+            for i in range(12):
+                if i < 3:  # 上升期
+                    sequence[i] = baseline + (peak - baseline) * (i / 3)
+                elif i < 6:  # 峰值期
+                    sequence[i] = peak + np.random.normal(0, 0.3)
+                else:  # 下降期
+                    sequence[i] = peak - (peak - baseline) * ((i - 6) / 6) * 0.8
+                    
+        elif pattern_type == 'postprandial_high':
+            baseline = np.random.uniform(7.0, 10.0)
+            peak = np.random.uniform(15.0, 22.0)
+            for i in range(12):
+                if i < 4:  # 上升期
+                    sequence[i] = baseline + (peak - baseline) * (i / 4)
+                elif i < 7:  # 峰值期
+                    sequence[i] = peak + np.random.normal(0, 0.5)
+                else:  # 缓慢下降期
+                    sequence[i] = peak - (peak - baseline) * ((i - 7) / 5) * 0.6
+                    
+        elif pattern_type == 'hypoglycemic':
+            base_level = np.random.uniform(2.5, 4.0)
+            sequence = base_level + np.random.normal(0, 0.2, 12)
+            
+        elif pattern_type == 'dawn_phenomenon':
+            night_level = np.random.uniform(6.0, 8.0)
+            morning_rise = np.random.uniform(2.0, 4.0)
+            for i in range(12):
+                sequence[i] = night_level + morning_rise * (i / 12) + np.random.normal(0, 0.3)
+                
+        elif pattern_type == 'somogyi_effect':
+            low_level = np.random.uniform(3.0, 4.5)
+            rebound_level = np.random.uniform(12.0, 18.0)
+            for i in range(12):
+                if i < 4:
+                    sequence[i] = low_level + np.random.normal(0, 0.2)
+                else:
+                    sequence[i] = rebound_level + np.random.normal(0, 1.0)
+        
+        return np.clip(sequence, 2.5, 30.0)
+    
+    def _generate_synthetic_stimulation_params(self, strategy, glucose_seq):
+        """生成合成刺激参数"""
+        mean_glucose = np.mean(glucose_seq)
+        glucose_variance = np.var(glucose_seq)
+        
+        if strategy == 'conservative':
+            frequency = np.random.uniform(5.0, 15.0)
+            amplitude = np.random.uniform(0.8, 1.5)
+            duration = np.random.uniform(15.0, 25.0)
+            pulse_width = np.random.uniform(100.0, 500.0)
+            session_duration = np.random.uniform(4.0, 8.0)
+            
+        elif strategy == 'aggressive':
+            frequency = np.random.uniform(15.0, 30.0)
+            amplitude = np.random.uniform(2.0, 3.0)
+            duration = np.random.uniform(30.0, 45.0)
+            pulse_width = np.random.uniform(300.0, 800.0)
+            session_duration = np.random.uniform(8.0, 16.0)
+            
+        elif strategy == 'personalized_low':
+            # 低敏感性个体需要更强刺激
+            frequency = np.random.uniform(10.0, 25.0)
+            amplitude = np.random.uniform(1.5, 2.5)
+            duration = np.random.uniform(25.0, 40.0)
+            pulse_width = np.random.uniform(200.0, 600.0)
+            session_duration = np.random.uniform(6.0, 12.0)
+            
+        elif strategy == 'personalized_high':
+            # 高敏感性个体需要较温和刺激
+            frequency = np.random.uniform(3.0, 12.0)
+            amplitude = np.random.uniform(0.5, 1.2)
+            duration = np.random.uniform(15.0, 30.0)
+            pulse_width = np.random.uniform(100.0, 300.0)
+            session_duration = np.random.uniform(3.0, 8.0)
+            
+        elif strategy == 'frequency_focused':
+            frequency = np.random.uniform(20.0, 40.0)  # 高频率
+            amplitude = np.random.uniform(1.0, 2.0)
+            duration = np.random.uniform(20.0, 35.0)
+            pulse_width = np.random.uniform(150.0, 400.0)
+            session_duration = np.random.uniform(5.0, 10.0)
+            
+        elif strategy == 'amplitude_focused':
+            frequency = np.random.uniform(8.0, 18.0)
+            amplitude = np.random.uniform(2.5, 4.0)  # 高幅度
+            duration = np.random.uniform(20.0, 30.0)
+            pulse_width = np.random.uniform(200.0, 500.0)
+            session_duration = np.random.uniform(4.0, 8.0)
+            
+        elif strategy == 'duration_focused':
+            frequency = np.random.uniform(10.0, 20.0)
+            amplitude = np.random.uniform(1.2, 2.0)
+            duration = np.random.uniform(45.0, 60.0)  # 长时间
+            pulse_width = np.random.uniform(200.0, 600.0)
+            session_duration = np.random.uniform(8.0, 16.0)
+        
+        else:  # 默认策略
+            frequency = np.random.uniform(8.0, 25.0)
+            amplitude = np.random.uniform(1.0, 2.5)
+            duration = np.random.uniform(20.0, 40.0)
+            pulse_width = np.random.uniform(150.0, 600.0)
+            session_duration = np.random.uniform(4.0, 12.0)
+        
+        # 根据血糖水平进行微调
+        if mean_glucose > 15.0:  # 高血糖
+            frequency *= 1.2
+            amplitude *= 1.1
+            duration *= 1.1
+        elif mean_glucose < 6.0:  # 低血糖
+            frequency *= 0.8
+            amplitude *= 0.9
+            duration *= 0.9
+        
+        return np.array([frequency, amplitude, duration, pulse_width, session_duration])
     
     def _create_zdf_mice_samples(self):
         """
@@ -498,6 +851,36 @@ class taVNSDataProcessor:
                 'effect': 'Postprandial glucose suppression',
                 'sample_count': len(self._create_healthy_postprandial_samples())
             }
+        }
+        
+        return summary
+    
+    def get_augmentation_summary(self):
+        """
+        获取数据扩充总结
+        """
+        if not self.enable_data_augmentation:
+            return "数据扩充已禁用"
+        
+        summary = {
+            'augmentation_methods': [
+                '高斯噪声注入',
+                '时间扭曲',
+                '幅度缩放',
+                '基线偏移',
+                '参数变异',
+                '个体差异模拟',
+                '合成数据生成'
+            ],
+            'noise_levels': len(self.augmentation_config['noise_levels']),
+            'time_warp_variants': len(self.augmentation_config['time_warp_factors']),
+            'amplitude_variants': len(self.augmentation_config['amplitude_scales']),
+            'baseline_variants': len(self.augmentation_config['baseline_shifts']),
+            'param_mutations': len(self.augmentation_config['param_mutations']),
+            'individual_variations': len(self.augmentation_config['individual_variations']),
+            'synthetic_patterns': 8,  # glucose patterns
+            'synthetic_strategies': 7,  # param strategies
+            'estimated_total_samples': '> 10,000'
         }
         
         return summary

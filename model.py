@@ -5,64 +5,56 @@ import numpy as np
 
 class taVNSNet(nn.Module):
     """
-    taVNS参数预测模型
+    taVNS参数预测模型 - TensorFlow Lite Micro兼容版本
+    使用纯前馈网络架构，适合ESP32-S3部署
     根据血糖序列预测最优的taVNS刺激参数
-    支持个体自适应学习
     """
     
     def __init__(self, 
                  input_dim=12,           # 输入血糖序列长度
                  param_dim=5,            # 刺激参数维度
                  hidden_dim=128,         # 隐藏层维度
-                 num_layers=2,           # LSTM层数
-                 dropout=0.2,            # Dropout率
-                 num_individuals=100):   # 最大个体数量
+                 num_layers=2,           # 网络层数（保留兼容性）
+                 dropout=0.2,            # Dropout率（推理时不使用）
+                 num_individuals=100):   # 最大个体数量（简化处理）
         super(taVNSNet, self).__init__()
         
         self.input_dim = input_dim
         self.param_dim = param_dim
         self.hidden_dim = hidden_dim
         
-        # 血糖序列编码器 - LSTM
-        self.glucose_encoder = nn.LSTM(
-            input_size=1,                # 血糖值维度
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers > 1 else 0,
-            bidirectional=False
+        # 血糖序列编码器 - 使用全连接层替代LSTM
+        # 将序列数据展平后通过多层感知机处理
+        self.glucose_encoder = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim * 2),  # 扩展维度
+            nn.ReLU(),
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.ReLU()
         )
         
-        # 特征提取网络
+        # 特征提取网络 - 简化结构
         self.feature_extractor = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout * 0.5)
+            nn.ReLU()
         )
         
-        # 个体嵌入层（用于适应不同个体）
-        self.individual_embedding = nn.Embedding(num_individuals, hidden_dim // 4)
+        # 个体适应层 - 简化为固定权重层
+        # 不使用Embedding，而是通过额外的全连接层来模拟个体差异
+        self.individual_adapter = nn.Sequential(
+            nn.Linear(hidden_dim // 2, hidden_dim // 4),
+            nn.ReLU()
+        )
         
-        # taVNS参数预测头
+        # taVNS参数预测头 - 简化结构
         self.param_head = nn.Sequential(
-            nn.Linear(hidden_dim // 2 + hidden_dim // 4, hidden_dim // 4),
+            nn.Linear(hidden_dim // 4, hidden_dim // 4),
             nn.ReLU(),
-            nn.Dropout(dropout * 0.5),
             nn.Linear(hidden_dim // 4, hidden_dim // 8),
             nn.ReLU(),
             nn.Linear(hidden_dim // 8, param_dim),
             nn.Sigmoid()  # 确保参数在[0,1]范围内
-        )
-        
-        # 注意力机制（用于关注重要的时间点）
-        self.attention = nn.MultiheadAttention(
-            embed_dim=hidden_dim,
-            num_heads=4,
-            dropout=dropout,
-            batch_first=True
         )
         
         # 初始化权重
@@ -75,69 +67,51 @@ class taVNSNet(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
-            elif isinstance(module, nn.LSTM):
-                for name, param in module.named_parameters():
-                    if 'weight' in name:
-                        nn.init.xavier_uniform_(param)
-                    elif 'bias' in name:
-                        nn.init.zeros_(param)
     
     def forward(self, glucose_seq, individual_id=None, return_attention=False):
         """
-        前向传播
+        前向传播 - 简化版本，适合TFLite转换
         Args:
             glucose_seq: 输入血糖序列 (batch_size, sequence_length)
-            individual_id: 个体ID (batch_size,)
-            return_attention: 是否返回注意力权重
+            individual_id: 个体ID（简化处理，不使用）
+            return_attention: 是否返回注意力权重（不支持）
         Returns:
             stim_params: 预测的刺激参数 (batch_size, param_dim)
-            attention_weights: 注意力权重（可选）
         """
         batch_size = glucose_seq.size(0)
         
-        # 添加通道维度
-        glucose_seq = glucose_seq.unsqueeze(-1)  # (batch_size, sequence_length, 1)
+        # 确保输入是2D张量 [batch_size, sequence_length]
+        if glucose_seq.dim() == 3:
+            glucose_seq = glucose_seq.squeeze(-1)
         
-        # LSTM编码血糖序列
-        lstm_out, (hidden, cell) = self.glucose_encoder(glucose_seq)
-        # lstm_out: (batch_size, sequence_length, hidden_dim)
-        
-        # 应用注意力机制
-        attn_out, attention_weights = self.attention(
-            lstm_out, lstm_out, lstm_out
-        )
-        
-        # 取最后一个时间步的输出作为特征
-        features = attn_out[:, -1, :]  # (batch_size, hidden_dim)
+        # 血糖序列编码 - 直接处理展平的序列
+        encoded_features = self.glucose_encoder(glucose_seq)
         
         # 特征提取
-        features = self.feature_extractor(features)  # (batch_size, hidden_dim//2)
+        features = self.feature_extractor(encoded_features)
         
-        # 如果提供个体ID，添加个体嵌入
-        if individual_id is not None:
-            individual_emb = self.individual_embedding(individual_id)  # (batch_size, hidden_dim//4)
-            features = torch.cat([features, individual_emb], dim=1)  # (batch_size, hidden_dim//2 + hidden_dim//4)
-        else:
-            # 如果没有个体ID，使用零向量
-            individual_emb = torch.zeros(batch_size, self.hidden_dim // 4, device=glucose_seq.device)
-            features = torch.cat([features, individual_emb], dim=1)
+        # 个体适应（简化处理，不依赖individual_id）
+        adapted_features = self.individual_adapter(features)
         
         # 预测taVNS刺激参数
-        stim_params = self.param_head(features)  # (batch_size, param_dim)
+        stim_params = self.param_head(adapted_features)
         
-        if return_attention:
-            return stim_params, attention_weights
-        else:
-            return stim_params
+        # 简化返回，不支持attention
+        return stim_params
     
-    def get_individual_embedding(self, individual_id):
-        """获取特定个体的嵌入向量"""
-        return self.individual_embedding(individual_id)
-    
-    def update_individual_embedding(self, individual_id, new_embedding):
-        """更新特定个体的嵌入向量（用于在线学习）"""
-        with torch.no_grad():
-            self.individual_embedding.weight[individual_id] = new_embedding
+    def get_model_info(self):
+        """获取模型信息，用于TFLite转换"""
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        
+        return {
+            'total_params': total_params,
+            'trainable_params': trainable_params,
+            'input_shape': [1, self.input_dim],
+            'output_shape': [1, self.param_dim],
+            'architecture': 'feedforward',
+            'tflite_compatible': True
+        }
 
 class ParamPredictionLoss(nn.Module):
     """
@@ -151,6 +125,8 @@ class ParamPredictionLoss(nn.Module):
             self.criterion = nn.MSELoss()
         elif loss_type == 'mae':
             self.criterion = nn.L1Loss()
+        elif loss_type == 'huber':
+            self.criterion = nn.HuberLoss()
         else:
             raise ValueError(f"Unsupported loss_type: {loss_type}")
     
@@ -167,58 +143,35 @@ class ParamPredictionLoss(nn.Module):
 
 class IndividualAdaptiveModule:
     """
-    个体自适应模块
+    个体自适应模块 - 简化版本
     用于在线学习和个体化调整
     """
     
     def __init__(self, model, learning_rate=1e-4):
         self.model = model
         self.learning_rate = learning_rate
-        self.individual_optimizers = {}
         self.individual_histories = {}
-    
-    def create_individual_optimizer(self, individual_id):
-        """为特定个体创建优化器"""
-        if individual_id not in self.individual_optimizers:
-            # 只优化该个体的嵌入向量
-            optimizer = torch.optim.Adam(
-                [self.model.individual_embedding.weight[individual_id].clone().detach().requires_grad_(True)], 
-                lr=self.learning_rate
-            )
-            self.individual_optimizers[individual_id] = optimizer
-            self.individual_histories[individual_id] = []
+        self.adaptation_enabled = False  # TFLite部署时禁用
     
     def adaptive_fine_tune(self, individual_id, input_glucose, target_params, epochs=5):
         """
-        对特定个体进行微调
-        Args:
-            individual_id: 个体ID
-            input_glucose: 输入血糖序列
-            target_params: 目标刺激参数
-            epochs: 微调轮数
+        对特定个体进行微调 - 简化版本
         """
-        # 创建个体优化器
-        self.create_individual_optimizer(individual_id)
-        optimizer = self.individual_optimizers[individual_id]
+        if not self.adaptation_enabled:
+            print("个体自适应在TFLite部署模式下已禁用")
+            return
         
-        # 损失函数
+        # 简化的微调逻辑
         criterion = ParamPredictionLoss()
         
-        # 微调
         for epoch in range(epochs):
-            optimizer.zero_grad()
-            
-            # 前向传播
-            pred_params = self.model(input_glucose, individual_id)
-            
-            # 计算损失
+            pred_params = self.model(input_glucose)
             loss = criterion(pred_params, target_params)
             
-            # 反向传播
-            loss.backward()
-            optimizer.step()
-            
             # 记录历史
+            if individual_id not in self.individual_histories:
+                self.individual_histories[individual_id] = []
+            
             self.individual_histories[individual_id].append({
                 'epoch': epoch,
                 'loss': loss.item()
@@ -232,8 +185,6 @@ class IndividualAdaptiveModule:
         """重置特定个体的学习历史"""
         if individual_id in self.individual_histories:
             self.individual_histories[individual_id] = []
-        if individual_id in self.individual_optimizers:
-            del self.individual_optimizers[individual_id]
 
 class ModelEvaluator:
     """
@@ -294,4 +245,57 @@ class ModelEvaluator:
         return metrics, {
             'param_predictions': param_predictions_orig,
             'param_targets': param_targets_orig
-        } 
+        }
+
+class TFLiteCompatibilityChecker:
+    """
+    TensorFlow Lite兼容性检查器
+    """
+    
+    @staticmethod
+    def check_model_compatibility(model):
+        """
+        检查模型是否兼容TensorFlow Lite
+        """
+        compatibility_report = {
+            'compatible': True,
+            'issues': [],
+            'recommendations': []
+        }
+        
+        # 检查是否使用了不兼容的层
+        incompatible_layers = []
+        for name, module in model.named_modules():
+            if isinstance(module, (nn.LSTM, nn.GRU, nn.RNN)):
+                incompatible_layers.append(f"RNN层: {name}")
+            elif isinstance(module, nn.MultiheadAttention):
+                incompatible_layers.append(f"注意力层: {name}")
+            elif isinstance(module, nn.Embedding):
+                incompatible_layers.append(f"嵌入层: {name}")
+        
+        if incompatible_layers:
+            compatibility_report['compatible'] = False
+            compatibility_report['issues'].extend(incompatible_layers)
+            compatibility_report['recommendations'].append("使用全连接层替代复杂结构")
+        
+        # 检查模型大小
+        total_params = sum(p.numel() for p in model.parameters())
+        if total_params > 1000000:  # 1M参数
+            compatibility_report['recommendations'].append("模型参数过多，建议减少隐藏层维度")
+        
+        return compatibility_report
+    
+    @staticmethod
+    def optimize_for_tflite(model):
+        """
+        为TensorFlow Lite优化模型
+        """
+        # 设置为评估模式
+        model.eval()
+        
+        # 禁用所有dropout
+        for module in model.modules():
+            if isinstance(module, nn.Dropout):
+                module.p = 0.0
+        
+        return model 

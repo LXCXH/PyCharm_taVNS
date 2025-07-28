@@ -1,0 +1,20 @@
+{
+  "model_path": "TFLite_Output\\conversion_20250728_164723\\tavns_model_improved.tflite",
+  "input_shape": [
+    1,
+    12
+  ],
+  "output_shape": [
+    1,
+    5
+  ],
+  "model_size_bytes": 87904,
+  "conversion_time": "20250728_164723",
+  "original_model_dir": "Training_Outputs\\training_output_20250728_164551",
+  "improvements": [
+    "improved_weight_transfer",
+    "weight_transfer_verification",
+    "representative_dataset",
+    "conservative_optimization"
+  ]
+}

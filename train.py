@@ -12,12 +12,13 @@ warnings.filterwarnings('ignore')
 
 # 导入自定义模块
 from data_processor import taVNSDataProcessor, create_data_loaders
-from model import taVNSNet, ParamPredictionLoss, IndividualAdaptiveModule, ModelEvaluator
+from model import taVNSNet, ParamPredictionLoss, IndividualAdaptiveModule, ModelEvaluator, TFLiteCompatibilityChecker
 
 class taVNSTrainer:
     """
     taVNS参数预测模型训练器
     包含完整的训练流程、验证、早停等功能
+    增强版：支持TensorFlow Lite Micro部署
     """
     
     def __init__(self, model, device, learning_rate=1e-3, weight_decay=1e-5):
@@ -52,7 +53,7 @@ class taVNSTrainer:
         self.best_val_loss = float('inf')
         self.best_model_state = None
         
-        # 个体自适应模块
+        # 个体自适应模块（简化版）
         self.adaptive_module = IndividualAdaptiveModule(model, learning_rate=1e-4)
         
         # 创建输出目录
@@ -63,6 +64,35 @@ class taVNSTrainer:
         # 在Training_Outputs下创建具体的训练输出目录
         self.output_dir = os.path.join(parent_dir, f"training_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(self.output_dir, exist_ok=True)
+    
+    def check_tflite_compatibility(self):
+        """检查模型的TensorFlow Lite兼容性"""
+        print("\n=== TensorFlow Lite兼容性检查 ===")
+        compatibility_report = TFLiteCompatibilityChecker.check_model_compatibility(self.model)
+        
+        print(f"兼容性状态: {'✓ 兼容' if compatibility_report['compatible'] else '✗ 不兼容'}")
+        
+        if compatibility_report['issues']:
+            print("发现的问题:")
+            for issue in compatibility_report['issues']:
+                print(f"  - {issue}")
+        
+        if compatibility_report['recommendations']:
+            print("建议:")
+            for rec in compatibility_report['recommendations']:
+                print(f"  - {rec}")
+        
+        # 获取模型信息
+        model_info = self.model.get_model_info()
+        print(f"\n模型信息:")
+        print(f"  - 总参数: {model_info['total_params']:,}")
+        print(f"  - 可训练参数: {model_info['trainable_params']:,}")
+        print(f"  - 输入形状: {model_info['input_shape']}")
+        print(f"  - 输出形状: {model_info['output_shape']}")
+        print(f"  - 架构类型: {model_info['architecture']}")
+        print(f"  - TFLite兼容: {'是' if model_info['tflite_compatible'] else '否'}")
+        
+        return compatibility_report
     
     def train_epoch(self, train_loader):
         """
@@ -77,7 +107,7 @@ class taVNSTrainer:
             input_glucose = batch['input_glucose'].to(self.device)
             target_params = batch['stim_params'].to(self.device)
             
-            # 前向传播
+            # 前向传播（简化调用，不使用individual_id）
             pred_params = self.model(input_glucose)
             
             # 计算损失
@@ -118,7 +148,7 @@ class taVNSTrainer:
                 input_glucose = batch['input_glucose'].to(self.device)
                 target_params = batch['stim_params'].to(self.device)
                 
-                # 前向传播
+                # 前向传播（简化调用）
                 pred_params = self.model(input_glucose)
                 
                 # 计算损失
@@ -244,6 +274,17 @@ class taVNSTrainer:
         config['best_val_loss'] = self.best_val_loss
         config['final_epoch'] = len(self.train_losses)
         
+        # 添加TFLite兼容性信息
+        compatibility_report = TFLiteCompatibilityChecker.check_model_compatibility(self.model)
+        model_info = self.model.get_model_info()
+        
+        config['tflite_compatibility'] = {
+            'compatible': compatibility_report['compatible'],
+            'issues': compatibility_report['issues'],
+            'recommendations': compatibility_report['recommendations'],
+            'model_info': model_info
+        }
+        
         with open(os.path.join(self.output_dir, 'training_config.json'), 'w') as f:
             json.dump(config, f, indent=2)
     
@@ -252,12 +293,39 @@ class taVNSTrainer:
         设置数据处理器引用
         """
         self.data_processor = data_processor
+    
+    def optimize_for_tflite_deployment(self):
+        """
+        为TensorFlow Lite部署优化模型
+        """
+        print("\n=== 优化模型用于TensorFlow Lite部署 ===")
+        
+        # 应用TFLite优化
+        optimized_model = TFLiteCompatibilityChecker.optimize_for_tflite(self.model)
+        
+        # 保存优化后的模型
+        optimized_model_path = os.path.join(self.output_dir, 'tflite_optimized_model.pth')
+        torch.save({
+            'model_state_dict': optimized_model.state_dict(),
+            'model_config': {
+                'input_dim': optimized_model.input_dim,
+                'param_dim': optimized_model.param_dim,
+                'hidden_dim': optimized_model.hidden_dim
+            },
+            'optimization_applied': True,
+            'tflite_ready': True
+        }, optimized_model_path)
+        
+        print(f"TFLite优化模型已保存: {optimized_model_path}")
+        
+        return optimized_model
 
 def main():
     """
     主训练函数
     """
     print("=== 基于三篇论文数据的taVNS参数预测模型训练 ===")
+    print("=== TensorFlow Lite Micro兼容版本 ===")
     
     # 设置随机种子
     torch.manual_seed(42)
@@ -267,14 +335,17 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"使用设备: {device}")
     
-    # 创建数据处理器
+    # 创建数据处理器（启用数据扩充）
     print("创建数据处理器...")
-    data_processor = taVNSDataProcessor(target_sequence_length=12)
+    data_processor = taVNSDataProcessor(
+        target_sequence_length=12, 
+        enable_data_augmentation=True
+    )
     
-    # 生成基于论文的训练数据
+    # 生成基于论文的训练数据（包含大量扩充数据）
     print("生成基于论文的训练数据...")
     raw_samples = data_processor.create_comprehensive_dataset_from_papers()
-    print(f"生成了 {len(raw_samples)} 个训练样本")
+    print(f"总共生成了 {len(raw_samples)} 个训练样本")
     
     # 显示论文数据总结
     paper_summary = data_processor.get_paper_summary()
@@ -286,6 +357,23 @@ def main():
         print(f"    效果: {info.get('glucose_reduction', info.get('effect', 'N/A'))}")
         print(f"    样本数: {info['sample_count']}")
     
+    # 显示数据扩充总结
+    augmentation_summary = data_processor.get_augmentation_summary()
+    if isinstance(augmentation_summary, dict):
+        print("\n数据扩充总结:")
+        print(f"  扩充方法: {', '.join(augmentation_summary['augmentation_methods'])}")
+        print(f"  噪声变体: {augmentation_summary['noise_levels']}")
+        print(f"  时间扭曲变体: {augmentation_summary['time_warp_variants']}")
+        print(f"  幅度变体: {augmentation_summary['amplitude_variants']}")
+        print(f"  基线变体: {augmentation_summary['baseline_variants']}")
+        print(f"  参数变异: {augmentation_summary['param_mutations']}")
+        print(f"  个体差异: {augmentation_summary['individual_variations']}")
+        print(f"  合成模式: {augmentation_summary['synthetic_patterns']}")
+        print(f"  合成策略: {augmentation_summary['synthetic_strategies']}")
+        print(f"  估计总样本: {augmentation_summary['estimated_total_samples']}")
+    else:
+        print(f"\n数据扩充状态: {augmentation_summary}")
+    
     # 数据标准化
     print("\n数据标准化...")
     normalized_samples = data_processor.normalize_data(raw_samples)
@@ -294,26 +382,20 @@ def main():
     print("创建数据加载器...")
     train_loader, val_loader = create_data_loaders(
         normalized_samples, 
-        batch_size=16, 
+        batch_size=32,  # 增加批次大小以处理更多数据
         train_ratio=0.8
     )
     
-    # 创建模型
-    print("创建模型...")
+    # 创建TensorFlow Lite兼容模型
+    print("创建TensorFlow Lite兼容模型...")
     model = taVNSNet(
         input_dim=12,
         param_dim=5,
-        hidden_dim=128,
+        hidden_dim=128,  # 保持合理的隐藏层大小
         num_layers=2,
         dropout=0.2,
         num_individuals=100
     )
-    
-    # 打印模型信息
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"模型总参数: {total_params:,}")
-    print(f"可训练参数: {trainable_params:,}")
     
     # 创建训练器
     trainer = taVNSTrainer(
@@ -326,6 +408,9 @@ def main():
     # 设置数据处理器引用
     trainer.set_data_processor(data_processor)
     
+    # 检查TensorFlow Lite兼容性
+    compatibility_report = trainer.check_tflite_compatibility()
+    
     # 训练配置
     config = {
         'model_config': {
@@ -334,12 +419,14 @@ def main():
             'hidden_dim': 128,
             'num_layers': 2,
             'dropout': 0.2,
-            'num_individuals': 100
+            'num_individuals': 100,
+            'architecture_type': 'feedforward',
+            'tflite_compatible': True
         },
         'training_config': {
             'learning_rate': 1e-3,
             'weight_decay': 1e-5,
-            'batch_size': 16,
+            'batch_size': 32,
             'epochs': 100,
             'early_stopping_patience': 20,
             'train_ratio': 0.8
@@ -347,7 +434,9 @@ def main():
         'data_config': {
             'target_sequence_length': 12,
             'num_samples': len(raw_samples),
-            'paper_summary': paper_summary
+            'data_augmentation_enabled': True,
+            'paper_summary': paper_summary,
+            'augmentation_summary': augmentation_summary
         }
     }
     
@@ -388,9 +477,13 @@ def main():
     with open(os.path.join(trainer.output_dir, 'data_processor.pkl'), 'wb') as f:
         pickle.dump(data_processor, f)
     
+    # 优化模型用于TensorFlow Lite部署
+    optimized_model = trainer.optimize_for_tflite_deployment()
+    
     print(f"\n训练完成！所有文件保存在: {trainer.output_dir}")
     print("主要文件:")
     print(f"  - 最佳模型: {trainer.output_dir}/best_model.pth")
+    print(f"  - TFLite优化模型: {trainer.output_dir}/tflite_optimized_model.pth")
     print(f"  - 训练历史: {trainer.output_dir}/training_history.png")
     print(f"  - 训练配置: {trainer.output_dir}/training_config.json")
     print(f"  - 评估结果: {trainer.output_dir}/evaluation_results.json")
@@ -405,7 +498,7 @@ def main():
         input_glucose = sample_batch['input_glucose'][:3].to(device)
         target_params = sample_batch['stim_params'][:3].to(device)
         
-        # 预测
+        # 预测（简化调用）
         pred_params = model(input_glucose)
         
         # 反标准化
@@ -420,6 +513,10 @@ def main():
                   f"时长={pred_params_orig[i][2]:.1f}min, 脉宽={pred_params_orig[i][3]:.0f}μs, 周期={pred_params_orig[i][4]:.1f}周]")
             print(f"  目标参数: [频率={target_params_orig[i][0]:.2f}Hz, 电流={target_params_orig[i][1]:.2f}mA, "
                   f"时长={target_params_orig[i][2]:.1f}min, 脉宽={target_params_orig[i][3]:.0f}μs, 周期={target_params_orig[i][4]:.1f}周]")
+    
+    print("\n=== TensorFlow Lite部署准备完成 ===")
+    print("模型已优化并准备好转换为TensorFlow Lite格式")
+    print("可以使用convert_to_tflite.py脚本进行最终转换")
 
 if __name__ == "__main__":
     main() 

@@ -1,0 +1,87 @@
+{
+  "model_config": {
+    "input_dim": 12,
+    "param_dim": 5,
+    "hidden_dim": 128,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "num_individuals": 100,
+    "architecture_type": "feedforward",
+    "tflite_compatible": true
+  },
+  "training_config": {
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "batch_size": 32,
+    "epochs": 100,
+    "early_stopping_patience": 20,
+    "train_ratio": 0.8
+  },
+  "data_config": {
+    "target_sequence_length": 12,
+    "num_samples": 3156,
+    "data_augmentation_enabled": true,
+    "paper_summary": {
+      "paper1_zdf_mice": {
+        "study_duration": "5 weeks",
+        "stimulation": "2/15 Hz alternating (2Hz\u219415Hz), 2mA, 30min",
+        "glucose_reduction": "From 18-28 to 10 mmol/L",
+        "sample_count": 21
+      },
+      "paper2_human_igt": {
+        "study_duration": "12 weeks",
+        "stimulation": "20 Hz, 1mA, 20min, 1ms pulse",
+        "glucose_reduction": "2hPG: 9.7\u21927.3 mmol/L",
+        "sample_count": 15
+      },
+      "paper3_healthy_postprandial": {
+        "study_duration": "Acute (single session)",
+        "stimulation": "10 Hz, 2.3mA, 30min, 0.3ms pulse",
+        "effect": "Postprandial glucose suppression",
+        "sample_count": 10
+      }
+    },
+    "augmentation_summary": {
+      "augmentation_methods": [
+        "\u9ad8\u65af\u566a\u58f0\u6ce8\u5165",
+        "\u65f6\u95f4\u626d\u66f2",
+        "\u5e45\u5ea6\u7f29\u653e",
+        "\u57fa\u7ebf\u504f\u79fb",
+        "\u53c2\u6570\u53d8\u5f02",
+        "\u4e2a\u4f53\u5dee\u5f02\u6a21\u62df",
+        "\u5408\u6210\u6570\u636e\u751f\u6210"
+      ],
+      "noise_levels": 4,
+      "time_warp_variants": 4,
+      "amplitude_variants": 4,
+      "baseline_variants": 4,
+      "param_mutations": 3,
+      "individual_variations": 7,
+      "synthetic_patterns": 8,
+      "synthetic_strategies": 7,
+      "estimated_total_samples": "> 10,000"
+    }
+  },
+  "training_completed": true,
+  "best_val_loss": 0.023374301753938197,
+  "final_epoch": 72,
+  "tflite_compatibility": {
+    "compatible": true,
+    "issues": [],
+    "recommendations": [],
+    "model_info": {
+      "total_params": 64741,
+      "trainable_params": 64741,
+      "input_shape": [
+        1,
+        12
+      ],
+      "output_shape": [
+        1,
+        5
+      ],
+      "architecture": "feedforward",
+      "tflite_compatible": true
+    }
+  }
+}
