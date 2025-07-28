@@ -1,0 +1,119 @@
+{
+  "generation_info": {
+    "timestamp": "2025-07-28T20:00:06.307554",
+    "script_version": "1.0",
+    "training_directory": "Training_Outputs\\training_output_20250728_195138",
+    "tflite_model_path": "TFLite_Output\\conversion_20250728_195929_EXCELLENT\\tavns_model_float32.tflite"
+  },
+  "model_info": {
+    "input_size": 12,
+    "output_size": 5,
+    "model_size_bytes": 263224,
+    "model_size_kb": 257.1
+  },
+  "training_config": {
+    "model_config": {
+      "input_dim": 12,
+      "param_dim": 5,
+      "hidden_dim": 128,
+      "num_layers": 2,
+      "dropout": 0.2,
+      "num_individuals": 100,
+      "architecture_type": "feedforward",
+      "tflite_compatible": true
+    },
+    "training_config": {
+      "learning_rate": 0.001,
+      "weight_decay": 1e-05,
+      "batch_size": 32,
+      "epochs": 100,
+      "early_stopping_patience": 20,
+      "train_ratio": 0.8
+    },
+    "data_config": {
+      "target_sequence_length": 12,
+      "num_samples": 3156,
+      "data_augmentation_enabled": true,
+      "paper_summary": {
+        "paper1_zdf_mice": {
+          "study_duration": "5 weeks",
+          "stimulation": "2/15 Hz alternating (2Hz↔15Hz), 2mA, 30min",
+          "glucose_reduction": "From 18-28 to 10 mmol/L",
+          "sample_count": 21
+        },
+        "paper2_human_igt": {
+          "study_duration": "12 weeks",
+          "stimulation": "20 Hz, 1mA, 20min, 1ms pulse",
+          "glucose_reduction": "2hPG: 9.7→7.3 mmol/L",
+          "sample_count": 15
+        },
+        "paper3_healthy_postprandial": {
+          "study_duration": "Acute (single session)",
+          "stimulation": "10 Hz, 2.3mA, 30min, 0.3ms pulse",
+          "effect": "Postprandial glucose suppression",
+          "sample_count": 10
+        }
+      },
+      "augmentation_summary": {
+        "augmentation_methods": [
+          "高斯噪声注入",
+          "时间扭曲",
+          "幅度缩放",
+          "基线偏移",
+          "参数变异",
+          "个体差异模拟",
+          "合成数据生成"
+        ],
+        "noise_levels": 4,
+        "time_warp_variants": 4,
+        "amplitude_variants": 4,
+        "baseline_variants": 4,
+        "param_mutations": 3,
+        "individual_variations": 7,
+        "synthetic_patterns": 8,
+        "synthetic_strategies": 7,
+        "estimated_total_samples": "> 10,000"
+      }
+    },
+    "training_completed": true,
+    "best_val_loss": 0.023374301753938197,
+    "final_epoch": 72,
+    "tflite_compatibility": {
+      "compatible": true,
+      "issues": [],
+      "recommendations": [],
+      "model_info": {
+        "total_params": 64741,
+        "trainable_params": 64741,
+        "input_shape": [
+          1,
+          12
+        ],
+        "output_shape": [
+          1,
+          5
+        ],
+        "architecture": "feedforward",
+        "tflite_compatible": true
+      }
+    }
+  },
+  "evaluation_results": {
+    "param_mse": 0.023428309331589108,
+    "param_mae": 24.761585235595703,
+    "param_rmse": 66.85224914550781
+  },
+  "arduino_files": {
+    "main_program": "esp32_tavns_test.ino",
+    "model_data": "tavns_model_data.h",
+    "scaler_params": "scaler_params.h",
+    "readme": "README.md"
+  },
+  "usage_instructions": {
+    "step1": "在Arduino IDE中打开esp32_tavns_test.ino",
+    "step2": "选择ESP32S3 Dev Module开发板",
+    "step3": "配置PSRAM和分区方案",
+    "step4": "编译并上传到ESP32-S3",
+    "step5": "打开串口监视器查看测试结果"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "conversion_info": {
+    "timestamp": "20250728_195929",
+    "source_model": "Training_Outputs\\training_output_20250728_195138",
+    "conversion_quality": "excellent",
+    "success": true
+  },
+  "model_details": {
+    "input_dim": 12,
+    "param_dim": 5,
+    "hidden_dim": 128,
+    "model_size_bytes": 263224,
+    "model_size_kb": 257.1
+  },
+  "accuracy_metrics": {
+    "normalized_space_mae": 1.9818545027305845e-08,
+    "original_space_mae": 1.0271071914758068e-05,
+    "test_samples_count": 5
+  },
+  "output_files": {
+    "tflite_model": "tavns_model_improved.tflite",
+    "model_info": "model_info.json",
+    "comparison_results": "model_comparison.json",
+    "summary": "conversion_summary.json"
+  }
+}

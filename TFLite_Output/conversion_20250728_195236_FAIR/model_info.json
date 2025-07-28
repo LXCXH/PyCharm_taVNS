@@ -1,0 +1,24 @@
+{
+  "model_path": "TFLite_Output\\conversion_20250728_195236\\tavns_model_improved.tflite",
+  "input_shape": [
+    1,
+    12
+  ],
+  "output_shape": [
+    1,
+    5
+  ],
+  "model_size_bytes": 87904,
+  "model_size_kb": 85.84375,
+  "conversion_time": "20250728_195236",
+  "original_model_dir": "Training_Outputs\\training_output_20250728_195138",
+  "optimization_type": "量化优化",
+  "quantized": true,
+  "esp32_compatible": false,
+  "improvements": [
+    "improved_weight_transfer",
+    "weight_transfer_verification",
+    "representative_dataset",
+    "quantization_optimization"
+  ]
+}

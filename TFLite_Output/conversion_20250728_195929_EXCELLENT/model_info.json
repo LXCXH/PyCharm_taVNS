@@ -1,0 +1,24 @@
+{
+  "model_path": "TFLite_Output\\conversion_20250728_195929\\tavns_model_float32.tflite",
+  "input_shape": [
+    1,
+    12
+  ],
+  "output_shape": [
+    1,
+    5
+  ],
+  "model_size_bytes": 263224,
+  "model_size_kb": 257.0546875,
+  "conversion_time": "20250728_195929",
+  "original_model_dir": "Training_Outputs\\training_output_20250728_195138",
+  "optimization_type": "Float32·ÇÁ¿»¯",
+  "quantized": false,
+  "esp32_compatible": true,
+  "improvements": [
+    "improved_weight_transfer",
+    "weight_transfer_verification",
+    "float32_non_quantized",
+    "esp32_optimized"
+  ]
+}

@@ -40,7 +40,19 @@ class PyTorchToTFLiteConverter:
         else:
             self.model_dir = model_dir
             
-        self.model_path = os.path.join(self.model_dir, "best_model.pth")
+        # 模型文件路径 - 优先使用TFLite优化版本
+        tflite_optimized_path = os.path.join(self.model_dir, "tflite_optimized_model.pth")
+        best_model_path = os.path.join(self.model_dir, "best_model.pth")
+        
+        if os.path.exists(tflite_optimized_path):
+            self.model_path = tflite_optimized_path
+            print(f"✓ 使用TFLite优化模型: {tflite_optimized_path}")
+        elif os.path.exists(best_model_path):
+            self.model_path = best_model_path
+            print(f"✓ 使用最佳模型: {best_model_path}")
+        else:
+            raise FileNotFoundError(f"未找到模型文件: {tflite_optimized_path} 或 {best_model_path}")
+        
         self.config_path = os.path.join(self.model_dir, "training_config.json")
         self.data_processor_path = os.path.join(self.model_dir, "data_processor.pkl")
         
@@ -336,38 +348,68 @@ class PyTorchToTFLiteConverter:
             print("✗ 权重转移可能有问题 (差异较大)")
             return False
     
-    def convert_to_tflite(self, tf_model, model_config):
-        """转换为TensorFlow Lite模型 - 改进版"""
-        print("\n=== 转换为TensorFlow Lite ===")
+    def convert_to_tflite(self, tf_model, model_config, use_quantization=False):
+        """转换为TensorFlow Lite模型 - 改进版
+        
+        Args:
+            tf_model: TensorFlow模型
+            model_config: 模型配置
+            use_quantization: 是否使用量化优化 (默认False为Float32非量化，True为量化)
+        """
+        optimization_type = "量化优化" if use_quantization else "Float32非量化"
+        print(f"\n=== 转换为TensorFlow Lite ({optimization_type}) ===")
         
         # 创建转换器
         converter = tf.lite.TFLiteConverter.from_keras_model(tf_model)
         
-        # 设置优化选项 - 使用更保守的优化
-        converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        
-        # 只使用内置操作（适合微控制器）
-        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
-        
         # 设置输入形状
         input_shape = [1, model_config['input_dim']]
         
-        # 添加代表性数据集以提高量化质量
-        def representative_dataset():
-            for _ in range(100):
-                # 生成代表性输入数据
-                data = np.random.randn(1, model_config['input_dim']).astype(np.float32)
-                yield [data]
+        if use_quantization:
+            # 量化模式：使用更保守的优化
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            
+            # 只使用内置操作（适合微控制器）
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+            
+            # 添加代表性数据集以提高量化质量
+            def representative_dataset():
+                print("生成代表性数据集用于量化...")
+                
+                # 使用真实的训练数据样本
+                try:
+                    samples = self._generate_test_samples(self.data_processor)
+                    for i, sample in enumerate(samples):
+                        # 标准化输入
+                        normalized_sample = self.data_processor.glucose_scaler.transform([sample])
+                        yield [normalized_sample.astype(np.float32)]
+                        if i >= 99:  # 限制样本数量
+                            break
+                except:
+                    # 备选方案：使用随机数据
+                    for _ in range(100):
+                        data = np.random.randn(1, model_config['input_dim']).astype(np.float32)
+                        yield [data]
+            
+            converter.representative_dataset = representative_dataset
+        else:
+            # Float32非量化模式：专为ESP32-S3 TFLite Micro优化
+            converter.optimizations = []  # 不进行任何优化
+            converter.target_spec.supported_types = [tf.float32]  # 只支持float32
+            print("使用Float32非量化模式，专为ESP32-S3优化")
         
-        converter.representative_dataset = representative_dataset
+        # 设置输入输出类型
+        converter.inference_input_type = tf.float32
+        converter.inference_output_type = tf.float32
         
         try:
             # 转换模型
             tflite_model = converter.convert()
             print("TensorFlow Lite转换成功")
             
-            # 保存模型 - 使用统一的时间戳
-            tflite_filename = f"tavns_model_improved.tflite"
+            # 保存模型 - 根据量化选项选择文件名
+            model_suffix = "float32" if not use_quantization else "improved"
+            tflite_filename = f"tavns_model_{model_suffix}.tflite"
             tflite_path = os.path.join(self.output_dir, tflite_filename)
             
             with open(tflite_path, 'wb') as f:
@@ -376,24 +418,33 @@ class PyTorchToTFLiteConverter:
             print(f"TFLite模型已保存: {tflite_path}")
             
             # 保存模型信息
+            improvements = [
+                'improved_weight_transfer',
+                'weight_transfer_verification'
+            ]
+            
+            if use_quantization:
+                improvements.extend(['representative_dataset', 'quantization_optimization'])
+            else:
+                improvements.extend(['float32_non_quantized', 'esp32_optimized'])
+            
             model_info = {
                 'model_path': tflite_path,
                 'input_shape': input_shape,
                 'output_shape': [1, model_config['param_dim']],
                 'model_size_bytes': len(tflite_model),
+                'model_size_kb': len(tflite_model) / 1024,
                 'conversion_time': self.conversion_timestamp,
                 'original_model_dir': self.model_dir,
-                'improvements': [
-                    'improved_weight_transfer',
-                    'weight_transfer_verification', 
-                    'representative_dataset',
-                    'conservative_optimization'
-                ]
+                'optimization_type': optimization_type,
+                'quantized': use_quantization,
+                'esp32_compatible': not use_quantization,
+                'improvements': improvements
             }
             
             info_path = os.path.join(self.output_dir, f"model_info.json")
             with open(info_path, 'w') as f:
-                json.dump(model_info, f, indent=2)
+                json.dump(model_info, f, indent=2, ensure_ascii=False)
             
             print(f"模型信息已保存: {info_path}")
             print(f"模型大小: {len(tflite_model):,} 字节 ({len(tflite_model)/1024:.1f} KB)")
@@ -575,9 +626,14 @@ class PyTorchToTFLiteConverter:
         
         return test_samples
     
-    def run_conversion(self):
-        """运行完整的转换流程 - 改进版"""
-        print("=== PyTorch到TensorFlow Lite转换开始 (改进版) ===")
+    def run_conversion(self, use_quantization=False):
+        """运行完整的转换流程 - 改进版
+        
+        Args:
+            use_quantization: 是否使用量化优化 (默认False为Float32非量化，True为量化)
+        """
+        optimization_desc = "量化优化" if use_quantization else "Float32非量化"
+        print(f"=== PyTorch到TensorFlow Lite转换开始 (改进版 - {optimization_desc}) ===")
         
         try:
             # 1. 加载模型配置
@@ -604,7 +660,7 @@ class PyTorchToTFLiteConverter:
                 return False
             
             # 6. 转换为TFLite
-            tflite_path, model_info = self.convert_to_tflite(tf_model, model_config)
+            tflite_path, model_info = self.convert_to_tflite(tf_model, model_config, use_quantization)
             
             # 7. 模型对比测试
             if tflite_path:
@@ -693,17 +749,40 @@ class PyTorchToTFLiteConverter:
 
 def main():
     """主函数"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='taVNS模型TensorFlow Lite转换工具 (改进版)')
+    parser.add_argument('--float32', action='store_true', 
+                       help='使用Float32非量化模式（默认，专为ESP32-S3优化）')
+    parser.add_argument('--quantized', action='store_true', 
+                       help='使用量化优化模式')
+    
+    args = parser.parse_args()
+    
+    # 确定使用的转换模式
+    if args.quantized:
+        use_quantization = True
+        mode_desc = "量化优化模式"
+    else:
+        use_quantization = False
+        mode_desc = "Float32非量化 - 专为ESP32-S3 TFLite Micro优化（默认）"
+    
     print("=== taVNS模型TensorFlow Lite转换工具 (改进版) ===")
+    print(f"🔧 转换模式: {mode_desc}")
     
     # 创建转换器
     converter = PyTorchToTFLiteConverter()
     
     # 运行转换
-    success = converter.run_conversion()
+    success = converter.run_conversion(use_quantization)
     
     if success:
         print("\n✓ 转换成功完成！")
         print(f"输出文件位于: {converter.output_dir}")
+        if not use_quantization:
+            print("💡 提示: 使用 python Arduino_Test/generate_arduino_files.py 生成Arduino头文件")
+        else:
+            print("💡 提示: 如果ESP32输出固定值，建议使用默认的Float32非量化模式")
     else:
         print("\n✗ 转换失败")
         return 1
