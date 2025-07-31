@@ -419,6 +419,95 @@ G_low(t) = G_base × [1 + 0.05 × sin(t × π/6)] + N(0, (G_base × 0.02)²)
 - 振幅减少反映taVNS治疗后血糖稳定性改善
 - 噪声项模拟测量误差和个体生理变异
 
+#### 📊 周期性模型数据扩充示例
+
+**基础数据示例**:
+```
+G_base = 8.5 mmol/L
+时间点: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55] (分钟)
+原始血糖: [8.3, 8.8, 9.1, 8.9, 8.4, 8.2, 8.3, 8.7, 9.0, 8.8, 8.5, 8.4] mmol/L
+```
+
+**高斯噪声注入扩充**:
+```mermaid
+graph LR
+    A["原始序列<br/>[8.3, 8.8, 9.1, 8.9, 8.4, 8.2]"] --> B["噪声水平 0.02<br/>[8.28, 8.83, 9.13, 8.91, 8.38, 8.17]"]
+    A --> C["噪声水平 0.05<br/>[8.25, 8.89, 9.17, 8.86, 8.45, 8.24]"]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#fce4ec
+```
+
+**时间扭曲变换可视化**:
+<div style="display: flex; justify-content: space-around; margin: 20px 0; font-family: Arial, sans-serif;">
+    <div style="background: #e8f5e8; padding: 15px; border-radius: 10px; text-align: center; flex: 1; margin: 0 10px;">
+        <h5 style="margin: 0 0 10px 0; color: #2e7d32;">时间压缩 (0.9×)</h5>
+        <div style="font-size: 12px;">
+            更快的代谢速率<br/>
+            血糖变化更急剧<br/>
+            <strong>峰值时间提前</strong>
+        </div>
+        <div style="background: #c8e6c9; padding: 8px; margin-top: 10px; border-radius: 5px; font-size: 11px;">
+            峰值: 25分钟 → 22.5分钟
+        </div>
+    </div>
+    <div style="background: #fff3e0; padding: 15px; border-radius: 10px; text-align: center; flex: 1; margin: 0 10px;">
+        <h5 style="margin: 0 0 10px 0; color: #f57c00;">原始序列 (1.0×)</h5>
+        <div style="font-size: 12px;">
+            标准代谢速率<br/>
+            正常血糖节律<br/>
+            <strong>基准参考</strong>
+        </div>
+        <div style="background: #ffe0b2; padding: 8px; margin-top: 10px; border-radius: 5px; font-size: 11px;">
+            峰值: 25分钟
+        </div>
+    </div>
+    <div style="background: #fce4ec; padding: 15px; border-radius: 10px; text-align: center; flex: 1; margin: 0 10px;">
+        <h5 style="margin: 0 0 10px 0; color: #c2185b;">时间拉伸 (1.1×)</h5>
+        <div style="font-size: 12px;">
+            更慢的代谢速率<br/>
+            血糖变化缓慢<br/>
+            <strong>峰值时间延后</strong>
+        </div>
+        <div style="background: #f8bbd9; padding: 8px; margin-top: 10px; border-radius: 5px; font-size: 11px;">
+            峰值: 25分钟 → 27.5分钟
+        </div>
+    </div>
+</div>
+
+**ASCII可视化对比**:
+```
+原始序列 (G_base=8.5):
+时间:  0   5  10  15  20  25  30  35  40  45  50  55
+血糖: 8.3 8.8 9.1 8.9 8.4 8.2 8.3 8.7 9.0 8.8 8.5 8.4
+曲线:  ●---●---●---●---●---●---●---●---●---●---●---●
+
+噪声注入 (α=0.02):
+时间:  0   5  10  15  20  25  30  35  40  45  50  55  
+血糖: 8.28 8.83 9.13 8.91 8.38 8.17 8.32 8.73 8.98 8.83 8.47 8.37
+曲线:  ○---○---○---○---○---○---○---○---○---○---○---○
+
+幅度缩放 (scale=1.1):
+时间:  0   5  10  15  20  25  30  35  40  45  50  55
+血糖: 8.28 8.83 9.16 8.94 8.39 8.17 8.28 8.72 9.05 8.83 8.50 8.39  
+曲线:  ◇---◇---◇---◇---◇---◇---◇---◇---◇---◇---◇---◇
+
+基线偏移 (+0.3):
+时间:  0   5  10  15  20  25  30  35  40  45  50  55
+血糖: 8.6 9.1 9.4 9.2 8.7 8.5 8.6 9.0 9.3 9.1 8.8 8.7
+曲线:  ■---■---■---■---■---■---■---■---■---■---■---■
+```
+
+**扩充效果统计**:
+| 扩充方法 | 样本增量 | 血糖范围 | 变异系数 | 临床意义 |
+|---------|---------|---------|---------|---------|
+| 原始数据 | 1× | 8.2-9.1 | 0.034 | 基准参考 |
+| 高斯噪声 | 4× | 8.0-9.3 | 0.039 | 测量误差 |
+| 时间扭曲 | 4× | 8.1-9.2 | 0.036 | 代谢差异 |
+| 幅度缩放 | 4× | 8.0-9.4 | 0.041 | 敏感性差异 |
+| 基线偏移 | 4× | 7.7-9.6 | 0.034 | 代谢状态 |
+
 ### 2. 餐后血糖响应模型 (IGT模式)
 
 **分段函数模型**:
@@ -448,6 +537,125 @@ for i, t in enumerate(time_points):
         sequence[i] = peak_value - (peak_value - baseline) * ((t - 1.0) / 1.0) * 0.8
 ```
 
+#### 📊 餐后血糖响应模型扩充示例
+
+**IGT患者餐后血糖曲线示例**:
+```
+基线血糖 (G_baseline): 7.2 mmol/L  
+峰值血糖 (G_peak): 10.3 mmol/L
+时间点: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120] (分钟)
+原始曲线: [7.2, 8.1, 9.4, 10.3, 10.1, 9.8, 9.5, 9.1, 8.7, 8.4, 8.0, 7.7, 7.4]
+```
+
+**餐后血糖三阶段建模流程**:
+```mermaid
+graph TD
+    A["基线状态<br/>G_baseline = 7.2 mmol/L<br/>t = 0-30min"] --> B["上升期<br/>线性上升至峰值<br/>斜率 = (10.3-7.2)/0.5"]
+    
+    B --> C["峰值期<br/>G_peak ± N(0,0.3²)<br/>t = 30-60min"]
+    
+    C --> D["下降期<br/>指数衰减 × 0.8<br/>t = 60-120min"]
+    
+    D --> E["数据扩充"]
+    
+    E --> E1["个体差异<br/>variation ∈ [0.7,1.3]"]
+    E --> E2["代谢速率<br/>time_warp ∈ [0.9,1.1]"] 
+    E --> E3["胰岛素敏感性<br/>amplitude_scale ∈ [0.9,1.1]"]
+    E --> E4["基础代谢<br/>baseline_shift ∈ [-0.5,0.5]"]
+    
+    style A fill:#e8f5e8
+    style B fill:#fff3e0
+    style C fill:#ffcdd2
+    style D fill:#e1f5fe
+    style E fill:#f3e5f5
+```
+
+**不同扩充方法的餐后血糖曲线对比**:
+<div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+<h6 style="margin: 0 0 10px 0; color: #2E7D32;">🔴 个体差异扩充 (variation_factor = 1.2)</h6>
+<div style="font-family: monospace; font-size: 11px; background: #f8f8f8; padding: 10px; border-radius: 5px;">
+时间: 0   30   60   90  120 (分钟)<br/>
+原始: 7.2  10.3  9.5  8.4  7.4<br/>
+扩充: 8.6  12.4 11.4 10.1  8.9<br/>
+差异: +1.4 +2.1 +1.9 +1.7 +1.5
+</div>
+<div style="color: #666; font-size: 12px; margin-top: 8px;">
+💡 模拟胰岛素抵抗较重的个体
+</div>
+</div>
+
+<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #FF9800;">
+<h6 style="margin: 0 0 10px 0; color: #E65100;">🟡 时间扭曲扩充 (warp_factor = 0.9)</h6>  
+<div style="font-family: monospace; font-size: 11px; background: #f8f8f8; padding: 10px; border-radius: 5px;">
+时间: 0   27   54   81  108 (分钟)<br/>
+原始: 7.2  10.3  9.5  8.4  7.4<br/>
+扭曲: 7.2  10.3  9.1  7.9  7.2<br/>
+变化: 0   0   -0.4 -0.5 -0.2
+</div>
+<div style="color: #666; font-size: 12px; margin-top: 8px;">
+💡 模拟代谢更快的个体（峰值提前）
+</div>
+</div>
+
+<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+<h6 style="margin: 0 0 10px 0; color: #1565C0;">🔵 幅度缩放扩充 (scale_factor = 0.95)</h6>
+<div style="font-family: monospace; font-size: 11px; background: #f8f8f8; padding: 10px; border-radius: 5px;">
+时间: 0   30   60   90  120 (分钟)<br/>
+原始: 7.2  10.3  9.5  8.4  7.4<br/>
+缩放: 7.4   9.9  9.2  8.2  7.2<br/>
+变化: +0.2 -0.4 -0.3 -0.2  -0.2
+</div>
+<div style="color: #666; font-size: 12px; margin-top: 8px;">
+💡 模拟胰岛素敏感性较高的个体
+</div>
+</div>
+
+<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #9C27B0;">
+<h6 style="margin: 0 0 10px 0; color: #7B1FA2;">🟣 基线偏移扩充 (shift = -0.3)</h6>
+<div style="font-family: monospace; font-size: 11px; background: #f8f8f8; padding: 10px; border-radius: 5px;">
+时间: 0   30   60   90  120 (分钟)<br/>
+原始: 7.2  10.3  9.5  8.4  7.4<br/>
+偏移: 6.9  10.0  9.2  8.1  7.1<br/>
+差异: -0.3 -0.3 -0.3 -0.3 -0.3
+</div>
+<div style="color: #666; font-size: 12px; margin-top: 8px;">
+💡 模拟基础代谢率较低的个体
+</div>
+</div>
+
+</div>
+</div>
+
+**IGT模式扩充效果可视化**:
+```
+餐后血糖曲线对比 (2小时)
+血糖 (mmol/L)
+   12 |                    ◆ 个体差异(1.2×)  
+   11 |           ◆       ◆
+   10 |      ●---●---○   ○         ○ 原始曲线
+    9 |    ○         ○---○---○   ◇   ◇ 幅度缩放(0.95×)
+    8 |  ○               ○   ○---◇---◇
+    7 |○                         ◇---■ 基线偏移(-0.3)
+    6 |■---■---■---■---■---■---■
+      +--|---|---|---|---|---|---|-->时间
+      0  15  30  45  60  75  90 105 120(分钟)
+
+图例: ● 原始  ○ 时间扭曲  ◇ 幅度缩放  ◆ 个体差异  ■ 基线偏移
+```
+
+**扩充参数对餐后血糖的影响分析**:
+| 扩充类型 | 峰值时间 | 峰值高度 | AUC变化 | 临床解释 |
+|---------|---------|---------|---------|---------|
+| 原始数据 | 30分钟 | 10.3 | 基准值 | 标准IGT模式 |
+| 个体差异(1.2×) | 30分钟 | 12.4 | +20% | 胰岛素抵抗 |
+| 时间扭曲(0.9×) | 27分钟 | 10.3 | -5% | 快速代谢 |
+| 幅度缩放(0.95×) | 30分钟 | 9.9 | -8% | 高胰岛素敏感性 |
+| 基线偏移(-0.3) | 30分钟 | 10.0 | -12% | 低基础代谢 |
+
 ### 3. 糖尿病血糖趋势模型
 
 **线性趋势模型**:
@@ -464,6 +672,137 @@ G_DM(t) = G_base + β × t + ε(t)
 - 正β值: 血糖持续上升（胰岛素抵抗加重）
 - 负β值: 血糖逐渐下降（治疗响应）
 - 大噪声: 反映糖尿病患者血糖调节失控
+
+#### 📊 糖尿病趋势模型扩充示例
+
+**糖尿病血糖趋势基础数据**:
+```
+G_base = 15.2 mmol/L (糖尿病基线)
+β = 0.15 (正趋势 - 病情加重)
+时间点: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55] (每5分钟)
+原始趋势: [15.2, 15.95, 16.7, 17.45, 18.2, 18.95, 19.7, 20.45, 21.2, 21.95, 22.7, 23.45]
+```
+
+**不同趋势系数的血糖变化模式**:
+```mermaid
+graph TD
+    A["糖尿病基线<br/>G_base = 15.2 mmol/L"] --> B["趋势建模<br/>G(t) = G_base + β×t + ε(t)"]
+    
+    B --> C1["恶化趋势<br/>β = +0.15<br/>血糖持续上升"]
+    B --> C2["稳定趋势<br/>β ≈ 0<br/>血糖波动维持"]  
+    B --> C3["改善趋势<br/>β = -0.10<br/>治疗效果显现"]
+    
+    C1 --> D["数据扩充变换"]
+    C2 --> D
+    C3 --> D
+    
+    D --> E1["高斯噪声<br/>σ = 1.0 (高变异)"]
+    D --> E2["个体差异<br/>variation ∈ [0.8,1.2]"]
+    D --> E3["参数变异<br/>β ± 0.05"]
+    D --> E4["基线调整<br/>G_base ± 2.0"]
+    
+    style A fill:#ffcdd2
+    style B fill:#fff3e0
+    style C1 fill:#ef5350
+    style C2 fill:#ffc107
+    style C3 fill:#66bb6a
+```
+
+**三种趋势模式的扩充对比**:
+<div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+<div style="background: #ffebee; padding: 15px; border-radius: 8px; flex: 1; margin-right: 10px; border-left: 4px solid #f44336;">
+<h6 style="margin: 0 0 10px 0; color: #c62828;">📈 恶化趋势 (β = +0.15)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+t=0:  15.2 → 16.1 → 15.0 → 16.3<br/>
+t=15: 17.5 → 18.2 → 16.8 → 18.5<br/>
+t=30: 19.7 → 20.9 → 18.4 → 21.1<br/>
+t=45: 22.0 → 23.4 → 20.6 → 23.8<br/>
+t=55: 23.5 → 24.7 → 22.1 → 25.2
+</div>
+<div style="font-size: 11px; color: #666; margin-top: 8px;">
+变换: 原始→噪声→个体(0.8×)→基线(+1.0)
+</div>
+</div>
+
+<div style="background: #fff8e1; padding: 15px; border-radius: 8px; flex: 1; margin: 0 5px; border-left: 4px solid #ff9800;">
+<h6 style="margin: 0 0 10px 0; color: #ef6c00;">➡️ 稳定趋势 (β ≈ 0.02)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+t=0:  15.2 → 15.8 → 13.7 → 16.4<br/>
+t=15: 15.5 → 16.2 → 14.0 → 16.8<br/>
+t=30: 15.8 → 16.1 → 14.2 → 16.9<br/>
+t=45: 16.1 → 16.9 → 14.5 → 17.3<br/>
+t=55: 16.3 → 16.7 → 14.7 → 17.2
+</div>
+<div style="font-size: 11px; color: #666; margin-top: 8px;">
+变换: 原始→噪声→个体(0.9×)→基线(+1.2)
+</div>
+</div>
+
+<div style="background: #e8f5e8; padding: 15px; border-radius: 8px; flex: 1; margin-left: 10px; border-left: 4px solid #4caf50;">
+<h6 style="margin: 0 0 10px 0; color: #2e7d32;">📉 改善趋势 (β = -0.10)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+t=0:  15.2 → 15.9 → 16.6 → 14.1<br/>
+t=15: 13.7 → 14.1 → 15.0 → 12.6<br/>
+t=30: 12.2 → 12.8 → 13.4 → 11.1<br/>
+t=45: 10.7 → 11.2 → 11.7 → 9.6<br/>
+t=55: 9.7 → 10.1 → 10.6 → 8.6
+</div>
+<div style="font-size: 11px; color: #666; margin-top: 8px;">
+变换: 原始→噪声→个体(1.1×)→基线(-1.1)
+</div>
+</div>
+
+</div>
+</div>
+
+**糖尿病血糖趋势可视化对比**:
+```
+糖尿病血糖趋势变化 (1小时)
+血糖 (mmol/L)
+   25 |                              ★ 恶化+扩充
+   24 |                         ★
+   23 |                    ★         ▲ 恶化原始
+   22 |               ▲         
+   21 |          ▲              
+   20 |     ▲                        ● 稳定原始/扩充
+   19 |▲                        ●---●---●---●
+   18 |                    ●---●
+   17 |               ●---●            ◆ 改善原始
+   16 |          ●---●                ◇ 改善+个体差异
+   15 |     ●---●        ◆
+   14 |●---●        ◆---◇---◇         ■ 改善+基线偏移
+   13 |        ◆---◇---◇---◇    
+   12 |   ◆---◇---◇---◇         ■---■
+   11 |◆---◇               ■---■---■
+   10 |                ■---■---■---■
+    9 |           ■---■---■---■---■
+      +--|---|---|---|---|---|---|-->时间
+      0   5  10  15  20  25  30  35  40  45  50  55(分钟)
+
+图例: ▲恶化原始 ★恶化扩充 ●稳定 ◆改善原始 ◇改善+个体 ■改善+基线
+```
+
+**趋势系数扩充矩阵**:
+| β值范围 | 临床意义 | 扩充策略 | 样本权重 | 目标参数调整 |
+|---------|---------|---------|---------|-------------|
+| +0.1~+0.2 | 病情恶化 | 高噪声+个体差异 | 30% | 增强刺激强度 |
+| -0.05~+0.05 | 病情稳定 | 标准扩充 | 40% | 维持性治疗 |
+| -0.2~-0.1 | 治疗响应 | 低噪声+时间扭曲 | 30% | 逐步减量 |
+
+**参数变异对趋势的影响**:
+```python
+# 原始参数: β = 0.15, G_base = 15.2
+# 变异示例:
+β_mutated = 0.15 × (1 ± 0.1)  # 变异范围: [0.135, 0.165]
+G_base_mutated = 15.2 ± 2.0    # 基线范围: [13.2, 17.2]
+
+# 扩充结果:
+变异1: β=0.135, G_base=13.2  → 轻度恶化，低基线
+变异2: β=0.165, G_base=17.2  → 重度恶化，高基线  
+变异3: β=0.150, G_base=15.2  → 标准恶化，中等基线
+```
 
 ### 4. 特殊病理生理模式
 
@@ -486,6 +825,136 @@ G_somogyi(t) = ⎧ G_low + N(0, 0.2²),      t < 4
 **参数**:
 - `G_low ∼ Uniform(3.0, 4.5)`: 夜间低血糖水平  
 - `G_rebound ∼ Uniform(12.0, 18.0)`: 反弹性高血糖
+
+#### 📊 特殊病理生理模式扩充示例
+
+**黎明现象扩充可视化**:
+```mermaid
+graph LR
+    A["夜间基线<br/>G_night = 6.5 mmol/L"] --> B["晨间升高<br/>ΔG = 3.0 mmol/L"]
+    B --> C["线性上升<br/>G(t) = 6.5 + 3.0×(t/12)"]
+    
+    C --> D1["个体差异扩充<br/>variation = 0.8"]
+    C --> D2["基线偏移扩充<br/>shift = +0.5"]
+    C --> D3["时间扭曲扩充<br/>warp = 1.1"]
+    
+    D1 --> E1["夜间5.2, 晨间7.6"]
+    D2 --> E2["夜间7.0, 晨间10.0"]  
+    D3 --> E3["上升更缓慢"]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D1 fill:#fce4ec
+    style D2 fill:#fff8e1
+    style D3 fill:#f3e5f5
+```
+
+**黎明现象扩充数据对比**:
+<div style="background: #f9f9f9; padding: 15px; border-radius: 10px; margin: 20px 0;">
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+<tr style="background: #e3f2fd; font-weight: bold;">
+<td style="padding: 8px; border: 1px solid #ddd;">时间点</td>
+<td style="padding: 8px; border: 1px solid #ddd;">原始模式</td>
+<td style="padding: 8px; border: 1px solid #ddd;">个体差异(0.8×)</td>
+<td style="padding: 8px; border: 1px solid #ddd;">基线偏移(+0.5)</td>
+<td style="padding: 8px; border: 1px solid #ddd;">时间扭曲(1.1×)</td>
+</tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">00:00</td><td style="padding: 6px; border: 1px solid #ddd;">6.5</td><td style="padding: 6px; border: 1px solid #ddd;">5.2</td><td style="padding: 6px; border: 1px solid #ddd;">7.0</td><td style="padding: 6px; border: 1px solid #ddd;">6.5</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">01:00</td><td style="padding: 6px; border: 1px solid #ddd;">6.75</td><td style="padding: 6px; border: 1px solid #ddd;">5.4</td><td style="padding: 6px; border: 1px solid #ddd;">7.25</td><td style="padding: 6px; border: 1px solid #ddd;">6.68</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">02:00</td><td style="padding: 6px; border: 1px solid #ddd;">7.0</td><td style="padding: 6px; border: 1px solid #ddd;">5.6</td><td style="padding: 6px; border: 1px solid #ddd;">7.5</td><td style="padding: 6px; border: 1px solid #ddd;">6.86</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">03:00</td><td style="padding: 6px; border: 1px solid #ddd;">7.25</td><td style="padding: 6px; border: 1px solid #ddd;">5.8</td><td style="padding: 6px; border: 1px solid #ddd;">7.75</td><td style="padding: 6px; border: 1px solid #ddd;">7.05</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">04:00</td><td style="padding: 6px; border: 1px solid #ddd;">7.5</td><td style="padding: 6px; border: 1px solid #ddd;">6.0</td><td style="padding: 6px; border: 1px solid #ddd;">8.0</td><td style="padding: 6px; border: 1px solid #ddd;">7.23</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">05:00</td><td style="padding: 6px; border: 1px solid #ddd;">7.75</td><td style="padding: 6px; border: 1px solid #ddd;">6.2</td><td style="padding: 6px; border: 1px solid #ddd;">8.25</td><td style="padding: 6px; border: 1px solid #ddd;">7.41</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">06:00</td><td style="padding: 6px; border: 1px solid #ddd;">8.0</td><td style="padding: 6px; border: 1px solid #ddd;">6.4</td><td style="padding: 6px; border: 1px solid #ddd;">8.5</td><td style="padding: 6px; border: 1px solid #ddd;">7.59</td></tr>
+<tr style="background: #ffeb3b; font-weight: bold;"><td style="padding: 6px; border: 1px solid #ddd;">07:00 (晨间)</td><td style="padding: 6px; border: 1px solid #ddd;">8.25</td><td style="padding: 6px; border: 1px solid #ddd;">6.6</td><td style="padding: 6px; border: 1px solid #ddd;">8.75</td><td style="padding: 6px; border: 1px solid #ddd;">7.77</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">08:00</td><td style="padding: 6px; border: 1px solid #ddd;">8.5</td><td style="padding: 6px; border: 1px solid #ddd;">6.8</td><td style="padding: 6px; border: 1px solid #ddd;">9.0</td><td style="padding: 6px; border: 1px solid #ddd;">7.95</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">升高幅度</td><td style="padding: 6px; border: 1px solid #ddd;">+2.0</td><td style="padding: 6px; border: 1px solid #ddd;">+1.6</td><td style="padding: 6px; border: 1px solid #ddd;">+2.0</td><td style="padding: 6px; border: 1px solid #ddd;">+1.45</td></tr>
+</table>
+</div>
+
+**苏木杰效应扩充可视化**:
+```
+苏木杰效应血糖变化模式 (12小时)
+血糖 (mmol/L)
+   18 |                    ◆---◆---◆ 个体差异(1.2×)
+   17 |                ◆---◆
+   16 |            ◆---◆           ★---★---★ 噪声注入
+   15 |        ◆---◆           ★---★
+   14 |    ◆---◆           ★---★
+   13 |◆---◆           ★---★             ● 原始模式
+   12 |           ●---●---●---●---●
+   11 |       ●---●
+   10 |   ●---●
+    9 |●---●
+    8 |                                    ■ 基线偏移(-0.8)
+    7 |                        ■---■---■---■---■
+    6 |                    ■---■
+    5 |                ■---■
+    4 |            ■---■    
+    3 |        ■---■  ○---○ 低血糖期原始
+    2 |    ■---■   ○---○
+    1 |■---■   ○---○
+      +---|---|---|---|---|---|---|---|---|---|---|-->时间
+      0   1   2   3   4   5   6   7   8   9  10  11  12
+
+图例: ○低血糖期 ●原始反弹 ★噪声注入 ◆个体差异 ■基线偏移
+```
+
+**特殊模式扩充参数矩阵**:
+| 病理模式 | 关键参数 | 扩充重点 | 临床变异范围 | 扩充倍数 |
+|---------|---------|---------|------------|---------|
+| 黎明现象 | ΔG_morning | 个体差异+时间扭曲 | 1.5-4.5 mmol/L | 6× |
+| 苏木杰效应 | G_rebound | 反弹幅度+噪声注入 | 8.0-20.0 mmol/L | 8× |
+| 正常变异 | 基线波动 | 标准扩充 | ±0.5 mmol/L | 4× |
+
+**病理模式识别特征**:
+```python
+# 黎明现象特征提取
+dawn_features = {
+    'night_baseline': np.mean(glucose[0:4]),      # 前4小时均值
+    'morning_peak': np.max(glucose[6:9]),        # 6-9点峰值  
+    'rise_gradient': (morning_peak - night_baseline) / 4,  # 上升梯度
+    'dawn_ratio': morning_peak / night_baseline   # 晨间比值
+}
+
+# 苏木杰效应特征提取  
+somogyi_features = {
+    'nadir_value': np.min(glucose[0:4]),         # 最低血糖值
+    'rebound_peak': np.max(glucose[4:8]),        # 反弹峰值
+    'rebound_ratio': rebound_peak / nadir_value, # 反弹倍数
+    'transition_speed': (rebound_peak - nadir_value) / 2  # 转换速度
+}
+```
+
+**病理模式扩充效果统计**:
+<div style="display: flex; justify-content: space-around; margin: 20px 0;">
+<div style="background: #e8f5e8; padding: 15px; border-radius: 10px; text-align: center; flex: 1; margin: 0 10px;">
+<h6 style="margin: 0 0 10px 0; color: #2e7d32;">🌅 黎明现象扩充</h6>
+<div style="font-size: 14px; margin: 10px 0;">
+<strong>基础样本:</strong> 12个<br/>
+<strong>扩充后:</strong> 72个<br/>
+<strong>扩充倍数:</strong> 6×
+</div>
+<div style="background: #c8e6c9; padding: 8px; border-radius: 5px; font-size: 12px;">
+覆盖升高幅度: 1.2-4.8 mmol/L<br/>
+包含个体差异: 0.7-1.3×
+</div>
+</div>
+
+<div style="background: #fff3e0; padding: 15px; border-radius: 10px; text-align: center; flex: 1; margin: 0 10px;">
+<h6 style="margin: 0 0 10px 0; color: #f57c00;">🔄 苏木杰效应扩充</h6>
+<div style="font-size: 14px; margin: 10px 0;">
+<strong>基础样本:</strong> 8个<br/>
+<strong>扩充后:</strong> 64个<br/>
+<strong>扩充倍数:</strong> 8×
+</div>
+<div style="background: #ffe0b2; padding: 8px; border-radius: 5px; font-size: 12px;">
+覆盖反弹幅度: 6.0-22.0 mmol/L<br/>
+包含噪声变异: 4种水平
+</div>
+</div>
+</div>
 
 ## ⚙️ 刺激参数优化模型
 
@@ -641,6 +1110,108 @@ G_augmented = np.clip(glucose_seq + noise, 3.0, 30.0)
 
 **目的**: 模拟血糖仪测量误差和生理微变化。
 
+#### 📊 高斯噪声注入扩充可视化
+
+**噪声注入前后对比**:
+```mermaid
+graph TD
+    A["原始血糖序列<br/>[8.2, 8.7, 9.1, 8.9, 8.5, 8.3]<br/>σ_original = 0.31"] --> B["噪声水平选择"]
+    
+    B --> C1["α = 0.01<br/>σ_noise = 0.0031"]
+    B --> C2["α = 0.02<br/>σ_noise = 0.0062"] 
+    B --> C3["α = 0.03<br/>σ_noise = 0.0093"]
+    B --> C4["α = 0.05<br/>σ_noise = 0.0155"]
+    
+    C1 --> D1["轻微噪声<br/>[8.19, 8.71, 9.11, 8.88, 8.51, 8.29]"]
+    C2 --> D2["低度噪声<br/>[8.17, 8.73, 9.13, 8.87, 8.53, 8.32]"]
+    C3 --> D3["中度噪声<br/>[8.15, 8.76, 9.16, 8.84, 8.56, 8.35]"]
+    C4 --> D4["高度噪声<br/>[8.11, 8.82, 9.22, 8.78, 8.63, 8.41]"]
+    
+    style A fill:#e3f2fd
+    style C1 fill:#e8f5e8
+    style C2 fill:#fff3e0
+    style C3 fill:#fff8e1
+    style C4 fill:#ffebee
+```
+
+**不同噪声水平的血糖曲线对比**:
+<div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+<div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #4CAF50;">
+<h6 style="margin: 0 0 8px 0; color: #2E7D32;">🟢 轻微噪声 (α=0.01)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #f8f8f8; padding: 8px; border-radius: 4px;">
+时间: 0   5  10  15  20  25 (分钟)<br/>
+原始: 8.2 8.7 9.1 8.9 8.5 8.3<br/>
+噪声: 8.19 8.71 9.11 8.88 8.51 8.29<br/>
+差值: -0.01 +0.01 +0.01 -0.02 +0.01 -0.01
+</div>
+<div style="color: #666; font-size: 11px; margin-top: 6px;">
+💡 模拟高精度血糖仪测量
+</div>
+</div>
+
+<div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #FF9800;">
+<h6 style="margin: 0 0 8px 0; color: #E65100;">🟡 低度噪声 (α=0.02)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #f8f8f8; padding: 8px; border-radius: 4px;">
+时间: 0   5  10  15  20  25 (分钟)<br/>
+原始: 8.2 8.7 9.1 8.9 8.5 8.3<br/>
+噪声: 8.17 8.73 9.13 8.87 8.53 8.32<br/>
+差值: -0.03 +0.03 +0.03 -0.03 +0.03 +0.02
+</div>
+<div style="color: #666; font-size: 11px; margin-top: 6px;">
+💡 模拟标准血糖仪精度
+</div>
+</div>
+
+<div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #2196F3;">
+<h6 style="margin: 0 0 8px 0; color: #1565C0;">🔵 中度噪声 (α=0.03)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #f8f8f8; padding: 8px; border-radius: 4px;">
+时间: 0   5  10  15  20  25 (分钟)<br/>
+原始: 8.2 8.7 9.1 8.9 8.5 8.3<br/>
+噪声: 8.15 8.76 9.16 8.84 8.56 8.35<br/>
+差值: -0.05 +0.06 +0.06 -0.06 +0.06 +0.05
+</div>
+<div style="color: #666; font-size: 11px; margin-top: 6px;">
+💡 模拟生理微变化影响
+</div>
+</div>
+
+<div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #F44336;">
+<h6 style="margin: 0 0 8px 0; color: #C62828;">🔴 高度噪声 (α=0.05)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #f8f8f8; padding: 8px; border-radius: 4px;">
+时间: 0   5  10  15  20  25 (分钟)<br/>
+原始: 8.2 8.7 9.1 8.9 8.5 8.3<br/>
+噪声: 8.11 8.82 9.22 8.78 8.63 8.41<br/>
+差值: -0.09 +0.12 +0.12 -0.12 +0.13 +0.11
+</div>
+<div style="color: #666; font-size: 11px; margin-top: 6px;">
+💡 模拟环境干扰和应激反应
+</div>
+</div>
+
+</div>
+</div>
+
+**高斯噪声分布特性**:
+```
+噪声水平α对血糖变异性的影响
+变异系数 (CV)
+  0.08 |              ◆ α=0.05
+  0.07 |          ◆
+  0.06 |      ◆           ▲ α=0.03  
+  0.05 |  ◆           ▲
+  0.04 |◆           ▲       ● α=0.02
+  0.03 |       ▲       ●
+  0.02 |   ▲       ●       ○ α=0.01
+  0.01 |▲       ●       ○
+  0.00 |   ●       ○---○---○ 原始
+       +---|---|---|---|---|----->采样次数
+       1   2   3   4   5   6
+
+图例: ○α=0.01 ●α=0.02 ▲α=0.03 ◆α=0.05
+```
+
 ### 2. 时间扭曲变换
 
 **数学原理**:
@@ -671,6 +1242,100 @@ if len(warped_indices) != N:
 
 **生理学意义**: 模拟不同个体的代谢速率差异。
 
+#### 📊 时间扭曲变换可视化示例
+
+**时间扭曲变换原理**:
+```mermaid
+graph TD
+    A["原始时间序列<br/>t = [0,5,10,15,20,25]<br/>G = [8.2,8.7,9.1,8.9,8.5,8.3]"] --> B["扭曲因子选择"]
+    
+    B --> C1["压缩 (0.9×)<br/>更快代谢"]
+    B --> C2["轻度压缩 (0.95×)<br/>略快代谢"]
+    B --> C3["轻度拉伸 (1.05×)<br/>略慢代谢"]  
+    B --> C4["拉伸 (1.1×)<br/>更慢代谢"]
+    
+    C1 --> D1["t_new = [0,4.5,9,13.5,18,22.5]<br/>峰值提前出现"]
+    C2 --> D2["t_new = [0,4.75,9.5,14.25,19,23.75]<br/>轻微提前"]
+    C3 --> D3["t_new = [0,5.25,10.5,15.75,21,26.25]<br/>轻微延后"]
+    C4 --> D4["t_new = [0,5.5,11,16.5,22,27.5]<br/>明显延后"]
+    
+    style A fill:#e3f2fd
+    style C1 fill:#ffcdd2
+    style C2 fill:#ffe0b2
+    style C3 fill:#dcedc8
+    style C4 fill:#c8e6c9
+```
+
+**不同代谢速率的血糖曲线对比**:
+<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+<div style="background: #ffebee; padding: 12px; border-radius: 8px; flex: 1; margin-right: 8px;">
+<h6 style="margin: 0 0 8px 0; color: #d32f2f;">⚡ 快速代谢 (0.9×)</h6>
+<div style="font-family: monospace; font-size: 9px; background: #fafafa; padding: 6px; border-radius: 4px;">
+原始时间: 0   5  10  15  20  25<br/>
+扭曲时间: 0  4.5  9 13.5 18 22.5<br/>
+血糖变化: 8.2→9.1→8.5 (22.5分钟内完成)<br/>
+峰值时间: 10分钟→9分钟 (提前1分钟)
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px;">
+💡 高基础代谢率个体
+</div>
+</div>
+
+<div style="background: #fff3e0; padding: 12px; border-radius: 8px; flex: 1; margin: 0 4px;">
+<h6 style="margin: 0 0 8px 0; color: #f57c00;">➡️ 标准代谢 (1.0×)</h6>
+<div style="font-family: monospace; font-size: 9px; background: #fafafa; padding: 6px; border-radius: 4px;">
+原始时间: 0   5  10  15  20  25<br/>
+标准时间: 0   5  10  15  20  25<br/>
+血糖变化: 8.2→9.1→8.3 (25分钟完成)<br/>
+峰值时间: 10分钟 (基准参考)
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px;">
+💡 正常代谢基准
+</div>
+</div>
+
+<div style="background: #e8f5e8; padding: 12px; border-radius: 8px; flex: 1; margin-left: 8px;">
+<h6 style="margin: 0 0 8px 0; color: #388e3c;">🐌 慢速代谢 (1.1×)</h6>
+<div style="font-family: monospace; font-size: 9px; background: #fafafa; padding: 6px; border-radius: 4px;">
+原始时间: 0   5  10  15  20  25<br/>
+扭曲时间: 0  5.5 11 16.5 22 27.5<br/>
+血糖变化: 8.2→9.1→8.3 (27.5分钟完成)<br/>
+峰值时间: 10分钟→11分钟 (延后1分钟)
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px;">
+💡 低基础代谢率个体
+</div>
+</div>
+
+</div>
+</div>
+
+**时间扭曲效果ASCII可视化**:
+```
+血糖时间序列扭曲对比 (30分钟)
+血糖 (mmol/L)
+ 9.2 |     ●快代谢(0.9×)
+ 9.1 |   ●   ○标准(1.0×)
+ 9.0 | ●       ○   ◇慢代谢(1.1×)
+ 8.9 |●         ○   ◇
+ 8.8 |           ○     ◇
+ 8.7 |             ○     ◇
+ 8.6 |               ○     ◇
+ 8.5 |                 ○     ◇
+ 8.4 |                   ○     ◇
+ 8.3 |                     ○     ◇
+ 8.2 |●                     ○       ◇
+     +---|---|---|---|---|---|---|---|-->时间
+     0   5  10  15  20  25  30  35  40(分钟)
+
+代谢特征对比:
+● 快代谢: 峰值9分钟, 下降快, 总时间22.5分钟
+○ 标准: 峰值10分钟, 标准下降, 总时间25分钟  
+◇ 慢代谢: 峰值11分钟, 下降慢, 总时间27.5分钟
+```
+
 ### 3. 幅度缩放变换
 
 **数学模型**:
@@ -688,6 +1353,92 @@ amplitude_scales = [0.9, 0.95, 1.05, 1.1]  # ±10%幅度缩放
 - 调整血糖波动幅度
 - 模拟个体血糖敏感性差异
 
+#### 📊 幅度缩放变换可视化示例
+
+**幅度缩放原理图**:
+```mermaid
+graph LR
+    A["原始序列<br/>μ=8.5, 波动±0.6"] --> B["均值保持不变"]
+    B --> C["缩放变换"]
+    
+    C --> D1["压缩 (0.9×)<br/>μ=8.5, 波动±0.54"]
+    C --> D2["轻度压缩 (0.95×)<br/>μ=8.5, 波动±0.57"]
+    C --> D3["轻度放大 (1.05×)<br/>μ=8.5, 波动±0.63"]
+    C --> D4["放大 (1.1×)<br/>μ=8.5, 波动±0.66"]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style D1 fill:#c8e6c9
+    style D2 fill:#dcedc8
+    style D3 fill:#ffe0b2
+    style D4 fill:#ffcdd2
+```
+
+**不同敏感性的血糖波动对比**:
+<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+<tr style="background: #e3f2fd; font-weight: bold;">
+<td style="padding: 8px; border: 1px solid #ddd;">时间点</td>
+<td style="padding: 8px; border: 1px solid #ddd;">原始序列</td>
+<td style="padding: 8px; border: 1px solid #ddd;">高敏感(0.9×)</td>
+<td style="padding: 8px; border: 1px solid #ddd;">中高敏感(0.95×)</td>
+<td style="padding: 8px; border: 1px solid #ddd;">中低敏感(1.05×)</td>
+<td style="padding: 8px; border: 1px solid #ddd;">低敏感(1.1×)</td>
+</tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">0分钟</td><td style="padding: 6px; border: 1px solid #ddd;">8.2</td><td style="padding: 6px; border: 1px solid #ddd;">8.27</td><td style="padding: 6px; border: 1px solid #ddd;">8.24</td><td style="padding: 6px; border: 1px solid #ddd;">8.18</td><td style="padding: 6px; border: 1px solid #ddd;">8.17</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">5分钟</td><td style="padding: 6px; border: 1px solid #ddd;">8.7</td><td style="padding: 6px; border: 1px solid #ddd;">8.68</td><td style="padding: 6px; border: 1px solid #ddd;">8.69</td><td style="padding: 6px; border: 1px solid #ddd;">8.71</td><td style="padding: 6px; border: 1px solid #ddd;">8.72</td></tr>
+<tr style="background: #ffeb3b;"><td style="padding: 6px; border: 1px solid #ddd;">10分钟(峰值)</td><td style="padding: 6px; border: 1px solid #ddd;">9.1</td><td style="padding: 6px; border: 1px solid #ddd;">9.04</td><td style="padding: 6px; border: 1px solid #ddd;">9.07</td><td style="padding: 6px; border: 1px solid #ddd;">9.13</td><td style="padding: 6px; border: 1px solid #ddd;">9.16</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">15分钟</td><td style="padding: 6px; border: 1px solid #ddd;">8.9</td><td style="padding: 6px; border: 1px solid #ddd;">8.86</td><td style="padding: 6px; border: 1px solid #ddd;">8.88</td><td style="padding: 6px; border: 1px solid #ddd;">8.92</td><td style="padding: 6px; border: 1px solid #ddd;">8.94</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">20分钟</td><td style="padding: 6px; border: 1px solid #ddd;">8.5</td><td style="padding: 6px; border: 1px solid #ddd;">8.51</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">25分钟</td><td style="padding: 6px; border: 1px solid #ddd;">8.3</td><td style="padding: 6px; border: 1px solid #ddd;">8.32</td><td style="padding: 6px; border: 1px solid #ddd;">8.31</td><td style="padding: 6px; border: 1px solid #ddd;">8.29</td><td style="padding: 6px; border: 1px solid #ddd;">8.28</td></tr>
+<tr style="background: #e8f5e8; font-weight: bold;"><td style="padding: 6px; border: 1px solid #ddd;">波动幅度</td><td style="padding: 6px; border: 1px solid #ddd;">±0.60</td><td style="padding: 6px; border: 1px solid #ddd;">±0.54</td><td style="padding: 6px; border: 1px solid #ddd;">±0.57</td><td style="padding: 6px; border: 1px solid #ddd;">±0.63</td><td style="padding: 6px; border: 1px solid #ddd;">±0.66</td></tr>
+<tr style="background: #fff3e0; font-weight: bold;"><td style="padding: 6px; border: 1px solid #ddd;">均值</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td><td style="padding: 6px; border: 1px solid #ddd;">8.50</td></tr>
+</table>
+
+</div>
+
+**敏感性差异的临床解释**:
+<div style="display: flex; justify-content: space-between; margin: 20px 0;">
+
+<div style="background: #e8f5e8; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px; text-align: center;">
+<h6 style="margin: 0 0 8px 0; color: #2e7d32;">🟢 高敏感性 (0.9×)</h6>
+<div style="font-size: 11px; color: #666;">
+血糖波动减小<br/>
+胰岛素反应良好<br/>
+<strong>需要温和刺激</strong>
+</div>
+<div style="background: #c8e6c9; padding: 6px; margin-top: 8px; border-radius: 4px; font-size: 10px;">
+刺激参数: -10%调整
+</div>
+</div>
+
+<div style="background: #fff3e0; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px; text-align: center;">
+<h6 style="margin: 0 0 8px 0; color: #f57c00;">🟡 标准敏感性 (1.0×)</h6>
+<div style="font-size: 11px; color: #666;">
+血糖波动正常<br/>
+标准胰岛素反应<br/>
+<strong>标准刺激方案</strong>
+</div>
+<div style="background: #ffe0b2; padding: 6px; margin-top: 8px; border-radius: 4px; font-size: 10px;">
+刺激参数: 标准方案
+</div>
+</div>
+
+<div style="background: #ffebee; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px; text-align: center;">
+<h6 style="margin: 0 0 8px 0; color: #d32f2f;">🔴 低敏感性 (1.1×)</h6>
+<div style="font-size: 11px; color: #666;">
+血糖波动增大<br/>
+胰岛素抵抗倾向<br/>
+<strong>需要强化刺激</strong>
+</div>
+<div style="background: #ffcdd2; padding: 6px; margin-top: 8px; border-radius: 4px; font-size: 10px;">
+刺激参数: +15%调整
+</div>
+</div>
+
+</div>
+
 ### 4. 基线偏移变换
 
 **数学模型**:
@@ -701,6 +1452,89 @@ baseline_shifts = [-0.5, -0.2, 0.2, 0.5]  # mmol/L
 ```
 
 **目的**: 模拟不同基础代谢状态。
+
+#### 📊 基线偏移变换可视化示例
+
+**基线偏移效果对比**:
+```mermaid
+graph TD
+    A["原始基线<br/>μ = 8.5 mmol/L"] --> B["偏移量选择"]
+    
+    B --> C1["下移 -0.5<br/>μ = 8.0 mmol/L"]
+    B --> C2["轻度下移 -0.2<br/>μ = 8.3 mmol/L"]
+    B --> C3["轻度上移 +0.2<br/>μ = 8.7 mmol/L"]
+    B --> C4["上移 +0.5<br/>μ = 9.0 mmol/L"]
+    
+    C1 --> D1["低基础代谢<br/>节能状态"]
+    C2 --> D2["轻度低代谢<br/>健康下限"]
+    C3 --> D3["轻度高代谢<br/>健康上限"]
+    C4 --> D4["高基础代谢<br/>应激状态"]
+    
+    style A fill:#e3f2fd
+    style C1 fill:#c8e6c9
+    style C2 fill:#dcedc8
+    style C3 fill:#ffe0b2
+    style C4 fill:#ffcdd2
+```
+
+**不同基础代谢状态的血糖对比**:
+```
+基线偏移对血糖曲线的影响
+血糖 (mmol/L)
+ 9.6 |                        ◆---◆---◆ 高代谢(+0.5)
+ 9.4 |                    ◆---◆
+ 9.2 |                ◆---◆           ▲---▲---▲ 轻度高代谢(+0.2)
+ 9.0 |            ◆---◆           ▲---▲
+ 8.8 |        ◆---◆           ▲---▲       ● 原始基线
+ 8.6 |    ◆---◆           ▲---▲       ●---●---●
+ 8.4 |◆---◆           ▲---▲       ●---●
+ 8.2 |           ▲---▲       ●---●           ○---○---○ 轻度低代谢(-0.2)
+ 8.0 |       ▲---▲       ●---●       ○---○
+ 7.8 |   ▲---▲       ●---●       ○---○           ■---■---■ 低代谢(-0.5)
+ 7.6 |●---●       ○---○       ■---■
+ 7.4 |       ○---○       ■---■
+ 7.2 |   ○---○       ■---■
+ 7.0 |○---○       ■---■
+     +---|---|---|---|---|---|---|---|---|---|---|-->时间
+     0   5  10  15  20  25  30  35  40  45  50  55(分钟)
+
+图例: ■低代谢 ○轻度低 ●原始 ▲轻度高 ◆高代谢
+```
+
+**基线偏移的生理学意义**:
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
+
+<div style="background: #e8f5e8; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+<h6 style="margin: 0 0 10px 0; color: #2e7d32;">📉 负偏移 (-0.2 ~ -0.5)</h6>
+<div style="font-size: 12px; color: #555; line-height: 1.4;">
+<strong>代表人群:</strong><br/>
+• 低基础代谢率个体<br/>
+• 长期节食者<br/>
+• 甲状腺功能减退<br/>
+• 老年人群<br/>
+<strong>刺激策略:</strong><br/>
+• 温和频率 (5-10 Hz)<br/>
+• 中等电流 (1.0-1.5 mA)<br/>
+• 延长时间 (30-45 min)
+</div>
+</div>
+
+<div style="background: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF9800;">
+<h6 style="margin: 0 0 10px 0; color: #f57c00;">📈 正偏移 (+0.2 ~ +0.5)</h6>
+<div style="font-size: 12px; color: #555; line-height: 1.4;">
+<strong>代表人群:</strong><br/>
+• 高基础代谢率个体<br/>
+• 应激状态患者<br/>
+• 甲状腺功能亢进<br/>
+• 年轻运动员<br/>
+<strong>刺激策略:</strong><br/>
+• 较高频率 (15-25 Hz)<br/>
+• 较强电流 (2.0-3.0 mA)<br/>
+• 标准时间 (20-30 min)
+</div>
+</div>
+
+</div>
 
 ### 5. 参数变异模拟
 
@@ -726,6 +1560,95 @@ pulse_width ∈ [50.0, 2000.0] μs
 session_duration ∈ [1.0, 20.0] weeks
 ```
 
+#### 📊 参数变异模拟可视化示例
+
+**参数变异流程图**:
+```mermaid
+graph TD
+    A["基础参数集<br/>f=20Hz, I=2mA, T=30min<br/>PW=300μs, D=8weeks"] --> B["变异率选择"]
+    
+    B --> C1["5%变异<br/>N(0, 0.05²)"]
+    B --> C2["10%变异<br/>N(0, 0.10²)"] 
+    B --> C3["15%变异<br/>N(0, 0.15²)"]
+    
+    C1 --> D1["轻微变异<br/>f=19.8Hz, I=2.1mA"]
+    C2 --> D2["中度变异<br/>f=18.5Hz, I=2.3mA"]
+    C3 --> D3["显著变异<br/>f=17.2Hz, I=2.6mA"]
+    
+    D1 --> E["约束检查"]
+    D2 --> E
+    D3 --> E
+    
+    E --> F1["频率约束<br/>[1.0, 50.0] Hz"]
+    E --> F2["电流约束<br/>[0.5, 5.0] mA"]
+    E --> F3["时长约束<br/>[10.0, 60.0] min"]
+    
+    style A fill:#e3f2fd
+    style E fill:#fff3e0
+```
+
+**参数变异效果对比表**:
+<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+<tr style="background: #e3f2fd; font-weight: bold;">
+<td style="padding: 8px; border: 1px solid #ddd;">参数</td>
+<td style="padding: 8px; border: 1px solid #ddd;">原始值</td>
+<td style="padding: 8px; border: 1px solid #ddd;">5%变异</td>
+<td style="padding: 8px; border: 1px solid #ddd;">10%变异</td>
+<td style="padding: 8px; border: 1px solid #ddd;">15%变异</td>
+<td style="padding: 8px; border: 1px solid #ddd;">约束范围</td>
+</tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">频率(Hz)</td><td style="padding: 6px; border: 1px solid #ddd;">20.0</td><td style="padding: 6px; border: 1px solid #ddd;">19.8±0.5</td><td style="padding: 6px; border: 1px solid #ddd;">18.5±1.2</td><td style="padding: 6px; border: 1px solid #ddd;">17.2±2.1</td><td style="padding: 6px; border: 1px solid #ddd;">[1.0, 50.0]</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">电流(mA)</td><td style="padding: 6px; border: 1px solid #ddd;">2.0</td><td style="padding: 6px; border: 1px solid #ddd;">2.1±0.1</td><td style="padding: 6px; border: 1px solid #ddd;">2.3±0.2</td><td style="padding: 6px; border: 1px solid #ddd;">2.6±0.3</td><td style="padding: 6px; border: 1px solid #ddd;">[0.5, 5.0]</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">时长(min)</td><td style="padding: 6px; border: 1px solid #ddd;">30.0</td><td style="padding: 6px; border: 1px solid #ddd;">29.7±1.2</td><td style="padding: 6px; border: 1px solid #ddd;">28.9±2.8</td><td style="padding: 6px; border: 1px solid #ddd;">27.5±4.1</td><td style="padding: 6px; border: 1px solid #ddd;">[10.0, 60.0]</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">脉宽(μs)</td><td style="padding: 6px; border: 1px solid #ddd;">300</td><td style="padding: 6px; border: 1px solid #ddd;">315±18</td><td style="padding: 6px; border: 1px solid #ddd;">342±35</td><td style="padding: 6px; border: 1px solid #ddd;">381±52</td><td style="padding: 6px; border: 1px solid #ddd;">[50, 2000]</td></tr>
+<tr><td style="padding: 6px; border: 1px solid #ddd;">周期(weeks)</td><td style="padding: 6px; border: 1px solid #ddd;">8.0</td><td style="padding: 6px; border: 1px solid #ddd;">8.2±0.4</td><td style="padding: 6px; border: 1px solid #ddd;">8.7±0.9</td><td style="padding: 6px; border: 1px solid #ddd;">9.3±1.4</td><td style="padding: 6px; border: 1px solid #ddd;">[1.0, 20.0]</td></tr>
+</table>
+
+</div>
+
+**参数变异的临床意义**:
+<div style="display: flex; justify-content: space-between; margin: 20px 0;">
+
+<div style="background: #e8f5e8; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px;">
+<h6 style="margin: 0 0 8px 0; color: #2e7d32;">🟢 轻微变异 (5%)</h6>
+<div style="font-size: 11px; color: #666;">
+<strong>应用场景:</strong><br/>
+• 设备校准差异<br/>
+• 操作者技术差异<br/>
+• 环境温湿度影响<br/>
+<strong>扩充目的:</strong><br/>
+模拟实际临床环境中的微小差异
+</div>
+</div>
+
+<div style="background: #fff3e0; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px;">
+<h6 style="margin: 0 0 8px 0; color: #f57c00;">🟡 中度变异 (10%)</h6>
+<div style="font-size: 11px; color: #666;">
+<strong>应用场景:</strong><br/>
+• 不同设备品牌<br/>
+• 电极位置差异<br/>
+• 皮肤阻抗变化<br/>
+<strong>扩充目的:</strong><br/>
+覆盖常见的参数调整范围
+</div>
+</div>
+
+<div style="background: #ffebee; padding: 12px; border-radius: 8px; flex: 1; margin: 0 5px;">
+<h6 style="margin: 0 0 8px 0; color: #d32f2f;">🔴 显著变异 (15%)</h6>
+<div style="font-size: 11px; color: #666;">
+<strong>应用场景:</strong><br/>
+• 个性化剂量调整<br/>
+• 治疗方案优化<br/>
+• 耐受性适应<br/>
+<strong>扩充目的:</strong><br/>
+探索参数优化的边界条件
+</div>
+</div>
+
+</div>
+
 ### 6. 个体差异建模
 
 **个体系数模型**:
@@ -743,6 +1666,134 @@ G_individual(t) = G_original(t) × variation_factor
 adjusted_params = adjust_params_for_glucose_and_sensitivity(
     base_params, varied_glucose, variation_factor
 )
+```
+
+#### 📊 个体差异建模可视化示例
+
+**个体差异建模流程**:
+```mermaid
+graph TD
+    A["标准个体<br/>variation = 1.0"] --> B["个体差异系数"]
+    
+    B --> C1["低敏感个体<br/>0.7×, 0.8×"]
+    B --> C2["标准个体<br/>0.9×, 1.0×, 1.1×"]
+    B --> C3["高敏感个体<br/>1.2×, 1.3×"]
+    
+    C1 --> D1["血糖反应迟钝<br/>需要强化刺激"]
+    C2 --> D2["血糖反应正常<br/>标准刺激方案"]
+    C3 --> D3["血糖反应敏感<br/>需要温和刺激"]
+    
+    D1 --> E1["参数上调<br/>+20%强度"]
+    D2 --> E2["参数标准<br/>基准强度"]
+    D3 --> E3["参数下调<br/>-15%强度"]
+    
+    style A fill:#e3f2fd
+    style C1 fill:#ffcdd2
+    style C2 fill:#fff3e0
+    style C3 fill:#c8e6c9
+```
+
+**不同个体敏感性的血糖响应对比**:
+<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+
+<div style="background: white; padding: 12px; border-radius: 8px; border: 2px solid #f44336;">
+<h6 style="margin: 0 0 10px 0; color: #d32f2f; text-align: center;">🔴 低敏感个体 (0.7×)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+原始血糖: 8.2  8.7  9.1  8.9  8.5  8.3<br/>
+调整血糖: 5.7  6.1  6.4  6.2  6.0  5.8<br/>
+变化率:   -30% -30% -30% -30% -29% -30%
+</div>
+<div style="background: #ffebee; padding: 8px; margin-top: 8px; border-radius: 4px;">
+<strong>刺激参数调整:</strong><br/>
+<div style="font-size: 10px;">
+频率: 20Hz → 24Hz (+20%)<br/>
+电流: 2.0mA → 2.4mA (+20%)<br/>
+时长: 30min → 36min (+20%)
+</div>
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px; text-align: center;">
+💡 胰岛素抵抗，需要强化刺激
+</div>
+</div>
+
+<div style="background: white; padding: 12px; border-radius: 8px; border: 2px solid #ff9800;">
+<h6 style="margin: 0 0 10px 0; color: #f57c00; text-align: center;">🟡 标准个体 (1.0×)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+原始血糖: 8.2  8.7  9.1  8.9  8.5  8.3<br/>
+调整血糖: 8.2  8.7  9.1  8.9  8.5  8.3<br/>
+变化率:    0%   0%   0%   0%   0%   0%
+</div>
+<div style="background: #fff3e0; padding: 8px; margin-top: 8px; border-radius: 4px;">
+<strong>刺激参数调整:</strong><br/>
+<div style="font-size: 10px;">
+频率: 20Hz → 20Hz (0%)<br/>
+电流: 2.0mA → 2.0mA (0%)<br/>
+时长: 30min → 30min (0%)
+</div>
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px; text-align: center;">
+💡 正常反应，标准刺激方案
+</div>
+</div>
+
+<div style="background: white; padding: 12px; border-radius: 8px; border: 2px solid #4caf50;">
+<h6 style="margin: 0 0 10px 0; color: #388e3c; text-align: center;">🟢 高敏感个体 (1.3×)</h6>
+<div style="font-family: monospace; font-size: 10px; background: #fafafa; padding: 8px; border-radius: 4px;">
+原始血糖: 8.2  8.7  9.1  8.9  8.5  8.3<br/>
+调整血糖: 10.7 11.3 11.8 11.6 11.1 10.8<br/>
+变化率:   +30% +30% +30% +30% +31% +30%
+</div>
+<div style="background: #e8f5e8; padding: 8px; margin-top: 8px; border-radius: 4px;">
+<strong>刺激参数调整:</strong><br/>
+<div style="font-size: 10px;">
+频率: 20Hz → 17Hz (-15%)<br/>
+电流: 2.0mA → 1.7mA (-15%)<br/>
+时长: 30min → 26min (-13%)
+</div>
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 6px; text-align: center;">
+💡 高敏感性，需要温和刺激
+</div>
+</div>
+
+</div>
+</div>
+
+**个体差异扩充效果统计汇总**:
+<div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+<tr style="background: #e3f2fd; font-weight: bold;">
+<td style="padding: 10px; border: 1px solid #ddd;">扩充方法</td>
+<td style="padding: 10px; border: 1px solid #ddd;">变换类型</td>
+<td style="padding: 10px; border: 1px solid #ddd;">参数范围</td>
+<td style="padding: 10px; border: 1px solid #ddd;">扩充倍数</td>
+<td style="padding: 10px; border: 1px solid #ddd;">临床意义</td>
+<td style="padding: 10px; border: 1px solid #ddd;">数据质量</td>
+</tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>高斯噪声</strong></td><td style="padding: 8px; border: 1px solid #ddd;">加性变换</td><td style="padding: 8px; border: 1px solid #ddd;">α ∈ [0.01,0.05]</td><td style="padding: 8px; border: 1px solid #ddd;">4×</td><td style="padding: 8px; border: 1px solid #ddd;">测量误差模拟</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐⭐⭐</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>时间扭曲</strong></td><td style="padding: 8px; border: 1px solid #ddd;">时域变换</td><td style="padding: 8px; border: 1px solid #ddd;">warp ∈ [0.9,1.1]</td><td style="padding: 8px; border: 1px solid #ddd;">4×</td><td style="padding: 8px; border: 1px solid #ddd;">代谢速率差异</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐⭐</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>幅度缩放</strong></td><td style="padding: 8px; border: 1px solid #ddd;">乘性变换</td><td style="padding: 8px; border: 1px solid #ddd;">scale ∈ [0.9,1.1]</td><td style="padding: 8px; border: 1px solid #ddd;">4×</td><td style="padding: 8px; border: 1px solid #ddd;">胰岛素敏感性</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐⭐⭐</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>基线偏移</strong></td><td style="padding: 8px; border: 1px solid #ddd;">平移变换</td><td style="padding: 8px; border: 1px solid #ddd;">shift ∈ [-0.5,0.5]</td><td style="padding: 8px; border: 1px solid #ddd;">4×</td><td style="padding: 8px; border: 1px solid #ddd;">基础代谢状态</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐⭐</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>参数变异</strong></td><td style="padding: 8px; border: 1px solid #ddd;">参数空间</td><td style="padding: 8px; border: 1px solid #ddd;">mutation ∈ [0.05,0.15]</td><td style="padding: 8px; border: 1px solid #ddd;">3×</td><td style="padding: 8px; border: 1px solid #ddd;">设备个体差异</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>个体差异</strong></td><td style="padding: 8px; border: 1px solid #ddd;">综合变换</td><td style="padding: 8px; border: 1px solid #ddd;">variation ∈ [0.7,1.3]</td><td style="padding: 8px; border: 1px solid #ddd;">7×</td><td style="padding: 8px; border: 1px solid #ddd;">个体化医疗</td><td style="padding: 8px; border: 1px solid #ddd;">⭐⭐⭐⭐⭐</td></tr>
+<tr style="background: #e8f5e8; font-weight: bold;"><td style="padding: 8px; border: 1px solid #ddd;"><strong>总计扩充</strong></td><td style="padding: 8px; border: 1px solid #ddd;">-</td><td style="padding: 8px; border: 1px solid #ddd;">-</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>~30×</strong></td><td style="padding: 8px; border: 1px solid #ddd;">覆盖临床多样性</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>⭐⭐⭐⭐</strong></td></tr>
+</table>
+
+</div>
+
+**扩充数据质量验证**:
+```
+数据扩充质量评估指标
+评估维度          原始数据    扩充后数据    改善程度
+血糖范围覆盖      [6.5,12.0]  [3.0,30.0]   +150%
+个体敏感性覆盖    [0.9,1.1]   [0.6,1.4]    +127%  
+参数多样性        较单一      高度多样      +200%
+临床场景覆盖      3种模式     8种模式       +167%
+样本数量          ~100个      >10,000个     +9900%
+数据平衡性        不均衡      均衡分布      显著改善
 ```
 
 ## 🏭 合成数据生成
