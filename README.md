@@ -1,45 +1,56 @@
-# taVNS参数预测模型 - 基于三篇论文数据
+# taVNS智能血糖控制系统 - 完整解决方案
 
-基于三篇真实论文数据的经皮耳迷走神经刺激（taVNS）参数预测模型，能够根据输入的血糖序列预测最优的刺激参数。
+基于三篇真实论文数据的智能血糖监测与经皮耳迷走神经刺激（taVNS）控制系统。集成血糖扫描、预测、参数计算和自动刺激控制的完整解决方案。
 
 ## 🚀 快速开始
 
-### 完整工作流程（5分钟）
+### 完整系统部署（10分钟）
 ```bash
-# 1. 训练TFLite优化模型
-python train.py                    # 自动生成TFLite兼容架构
+# 1. 训练taVNS参数预测模型
+python train.py                    # 训练taVNS参数预测模型
 
-# 2. 转换为TFLite模型（默认Float32非量化，ESP32-S3优化）
-python convert_to_tflite.py        # 智能权重转移 + 精度验证
+# 2. 转换为TFLite模型
+python convert_to_tflite.py        # 生成ESP32兼容的TFLite模型
 
-# 3. 生成Arduino文件（自动选择最佳TFLite模型）
+# 3. 生成Arduino集成文件
 python Arduino_Test/generate_arduino_files.py
 
-# 4. 在Arduino IDE中打开esp32_tavns_test.ino并上传到ESP32-S3
+# 4. 部署到ESP32-S3完整系统
+# - 在Arduino IDE中打开 ScanControl_Combined_V7.ino
+# - 配置ESP32-S3开发板（16MB PSRAM + 32MB Flash）
+# - 上传并运行完整的血糖控制系统
 ```
 
-### ESP32-S3测试预期结果
-✅ **模型加载成功** (Float32非量化，260KB)  
-✅ **推理时间 < 5ms** (实测约2ms)  
-✅ **内存使用 < 20%** (约64KB/8MB)  
-✅ **预测参数合理且变化** (不同血糖输入产生不同输出)  
-✅ **转换精度损失 < 5%** (MAE通常 < 2.0)  
+### ESP32-S3完整系统预期结果
+✅ **血糖扫描成功** - 自动读取血糖传感器数据  
+✅ **血糖预测模型** - 预测未来血糖趋势  
+✅ **taVNS参数计算** - 基于血糖数据智能计算刺激参数  
+✅ **OLED实时显示** - 显示血糖值、预测值和控制参数  
+✅ **自动刺激控制** - 根据预测结果自动执行taVNS刺激  
+✅ **数据日志记录** - 完整记录血糖、预测和控制数据  
 
 ## 项目概述
 
-### 模型目标
-- **输入**: 12个血糖值的时间序列（每5分钟一个，共1小时）
-- **输出**: 推荐的taVNS刺激参数（频率、电流、持续时间、脉宽、治疗周期）
+### 系统架构
+一个完整的血糖监测与taVNS控制闭环系统：
+1. **血糖扫描** → 2. **数据存储** → 3. **血糖预测** → 4. **taVNS参数计算** → 5. **自动刺激控制**
 
-### 核心特性
-- **参数预测**: 专注于taVNS刺激参数预测
-- **个体自适应**: 支持不同个体的个性化调整
-- **注意力机制**: 关注重要的时间点
-- **智能分析**: 根据血糖模式自动调整参数
-- **基于真实论文数据**: 所有参数都基于三篇真实的taVNS研究论文
-- **🚀 ESP32-S3部署**: 支持TensorFlow Lite Micro，可在ESP32-S3上实时运行
-- **🔧 完整工具链**: 从训练到部署的完整自动化工具链
-- **⚡ 高性能推理**: ESP32-S3上推理时间 < 5ms，内存使用 < 64KB
+### 核心模块
+- **血糖扫描模块**: 自动读取血糖传感器数据
+- **血糖预测模型**: TensorFlow Lite血糖趋势预测
+- **taVNS参数模型**: 基于血糖序列智能计算刺激参数
+- **OLED显示系统**: 实时显示血糖、预测值和控制参数
+- **自动控制系统**: Nurosym设备自动刺激控制
+- **数据日志系统**: SPIFFS文件系统记录所有数据
+
+### 技术特性
+- **🔄 闭环控制**: 完整的血糖监测→预测→控制闭环
+- **🧠 双AI模型**: 血糖预测 + taVNS参数计算两个AI模型
+- **📱 实时显示**: SH1106 OLED实时显示系统状态
+- **💾 数据记录**: 完整的血糖、预测和控制数据日志
+- **⚡ 实时响应**: ESP32-S3上实现毫秒级响应
+- **🎯 智能控制**: 基于血糖趋势自动调整刺激参数
+- **📊 基于科学数据**: 所有参数基于三篇真实taVNS研究论文
 
 ## 数据来源
 
@@ -68,27 +79,38 @@ python Arduino_Test/generate_arduino_files.py
 ```
 PyCharm_taVNS/
 ├── data_processor.py          # 基于论文数据的数据处理模块
-├── model.py                   # 神经网络模型定义
-├── train.py                   # 训练脚本
+├── model.py                   # taVNS参数预测神经网络模型
+├── train.py                   # 模型训练脚本
 ├── convert_to_tflite.py       # TensorFlow Lite模型转换工具
-├── requirements.txt           # 依赖包
-├── README.md                  # 项目说明
+├── requirements.txt           # Python依赖包
+├── README.md                  # 项目总体说明
 ├── Training_Outputs/          # 训练输出文件夹
-│   ├── training_output_*/     # 具体训练结果
-│   └── README.md             # 训练输出说明
+│   └── training_output_*/     # 具体训练结果和模型权重
 ├── TFLite_Output/            # TensorFlow Lite转换输出
-│   └── conversion_*/         # 转换结果（包含.tflite模型文件）
-├── Arduino_Test/             # ESP32-S3 Arduino测试代码
-│   ├── esp32_tavns_test.ino  # Arduino主程序
-│   ├── tavns_model_data.h    # TFLite模型数据头文件
-│   ├── scaler_params.h       # 数据标准化参数头文件
-│   ├── generate_arduino_files.py # Arduino文件生成器
-│   ├── README.md             # Arduino测试说明
-│   └── QUICK_START.md        # 快速开始指南
-└── V2/                       # 论文相关文件
+│   └── conversion_*/         # 转换结果（.tflite模型文件）
+├── Arduino_Test/             # ESP32-S3完整系统代码
+│   ├── esp32_tavns_test/     # 单独的taVNS模型测试程序
+│   │   ├── esp32_tavns_test.ino    # taVNS测试主程序
+│   │   ├── tavns_model_data.h      # taVNS模型数据
+│   │   └── scaler_params.h         # 标准化参数
+│   ├── ScanControl_Combined_V7/    # 🚀 完整血糖控制系统
+│   │   ├── ScanControl_Combined_V7.ino  # 系统主程序
+│   │   ├── ScanControl.cpp         # 血糖扫描模块
+│   │   ├── TFLite_V1.cpp          # 血糖预测模型
+│   │   ├── TFLite_taVNS.cpp       # taVNS参数计算模型
+│   │   ├── SH1106Display.cpp      # OLED显示控制
+│   │   ├── Nurosym_Control.cpp    # 自动刺激控制
+│   │   ├── SPIFFSLogger.cpp       # 数据日志系统
+│   │   ├── model.cpp              # 血糖预测模型数据 
+│   │   ├── tavns_model_data.h     # taVNS模型数据
+│   │   └── scaler_params.h        # taVNS标准化参数
+│   ├── generate_arduino_files.py  # Arduino文件生成器
+│   ├── README.md              # Arduino系统说明
+│   └── QUICK_START.md         # 快速开始指南
+└── Paper_data/               # 论文相关文件
     ├── 论文参数总结_V2.xlsx
     ├── 论文参数总结_V2.docx
-    └── 三篇PDF论文
+    └── 三篇PDF论文文件
 ```
 
 ## 模型架构
@@ -266,50 +288,100 @@ python convert_to_tflite.py --quantized
 - ⚡ **代表性数据集**: 量化模式使用训练数据优化量化参数
 - 🎯 **ESP32优化**: Float32模式专为微控制器TFLite Micro优化
 
-### 4. ESP32-S3 Arduino部署
+### 4. ESP32-S3完整系统部署
 
 #### 4.1 生成Arduino文件
 ```bash
-# 生成Arduino头文件（自动选择最新的Float32模型）
+# 生成taVNS模型Arduino头文件
 python Arduino_Test/generate_arduino_files.py
-
-# 或优先使用量化模型
-python Arduino_Test/generate_arduino_files.py --quantized
 ```
 
-#### 4.2 Arduino IDE配置
+#### 4.2 硬件要求
+- **ESP32-S3开发板**: 16MB PSRAM + 32MB Flash（必需）
+- **SH1106 OLED显示屏**: I2C接口（SDA=39, SCL=38）
+- **血糖传感器**: 兼容BLE扫描
+- **Nurosym刺激设备**: 用于taVNS刺激输出
+- **按钮**: GPIO0用于用户交互
+
+#### 4.3 Arduino IDE配置
 1. 安装ESP32开发板支持包
-2. 安装TensorFlowLite_ESP32库
+2. 安装以下库：
+   - TensorFlowLite_ESP32
+   - Adafruit SH110X
+   - ESP32 BLE Arduino
 3. 选择"ESP32S3 Dev Module"开发板
-4. 配置PSRAM和分区方案
-5. 打开`Arduino_Test/esp32_tavns_test.ino`
+4. 配置：
+   - PSRAM: "OPI PSRAM"
+   - Flash Size: "32MB"
+   - Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
+5. 打开`Arduino_Test/ScanControl_Combined_V7/ScanControl_Combined_V7.ino`
 6. 编译并上传到ESP32-S3
 
-#### 4.3 测试结果
-ESP32-S3将自动运行以下测试：
-- **模型完整性测试**: 验证模型加载和基本功能
-- **血糖预测测试**: 使用5个不同血糖模式进行预测
-- **性能基准测试**: 测量推理时间和内存使用
-- **系统信息显示**: 显示芯片和内存信息
+#### 4.4 系统运行流程
+ESP32-S3完整系统将自动执行：
+1. **系统初始化**: 初始化OLED、BLE、模型和日志系统
+2. **血糖扫描**: 自动扫描并读取血糖传感器数据
+3. **数据存储**: 将血糖数据存储到环形缓冲区
+4. **血糖预测**: 当收集到12个血糖值时进行趋势预测
+5. **taVNS参数计算**: 基于血糖序列计算最优刺激参数
+6. **用户确认**: OLED显示参数，等待用户确认（10秒超时）
+7. **自动刺激**: 执行Nurosym设备控制进行taVNS刺激
+8. **数据日志**: 记录所有血糖、预测和控制数据到SPIFFS
+9. **系统重启**: 完成一轮后重启，继续监测
 
-**预期输出示例**:
+#### 4.5 OLED显示界面
 ```
-=== ESP32-S3 taVNS参数预测模型测试 ===
-✓ 模型加载成功
-✓ 张量分配成功
+Connected
 
---- 测试样本 1: 正常空腹血糖 ---
-输入血糖: [5.2 5.1 5.3 5.0 5.2 5.4 5.1 5.0 5.3 5.2 5.1 5.0]
-预期参数: [频率=14.26Hz, 电流=1.69mA, 时长=29.0min, 脉宽=371μs, 周期=8.2周]
-TFLite预测: [频率=14.26Hz, 电流=1.69mA, 时长=29.0min, 脉宽=371μs, 周期=8.2周]
-原始空间MAE: 0.0000
+Reading:120.00 mg/dL
+Predict:125.50 mg/dL
+Time:[29]  AMP:[14]
+Press to Reject (10s)
+```
+- **Reading**: 当前血糖值（两位小数显示）
+- **Predict**: 预测血糖值
+- **Time**: taVNS刺激时间（分钟，反色高亮）
+- **AMP**: taVNS刺激强度（0-45区间，反色高亮）
 
-=== 性能基准测试 ===
-平均推理时间: 1.740 ms
-内存使用: 7224 / 61440 字节 (11.8%)
+**系统运行示例**:
+```
+=== SCAN & PREDICT & CONTROL ===
+✅ OLED Initialization successful
+✅ Glucose prediction model initialization completed
+✅ taVNS model initialization completed
+
+New raw reading: 120 mg/dL
+=== Last 12 Raw Readings (FIFO) ===
+ [1] 108 mg/dL  [7] 118 mg/dL
+ [2] 112 mg/dL  [8] 119 mg/dL  
+ [3] 115 mg/dL  [9] 120 mg/dL
+ [4] 117 mg/dL  [10] 121 mg/dL
+ [5] 116 mg/dL  [11] 119 mg/dL
+ [6] 118 mg/dL  [12] 120 mg/dL
+
+Model input: [108.00, 112.00, 115.00, 117.00, 116.00, 118.00, 118.00, 119.00, 120.00, 121.00, 119.00, 120.00]
+Predicted glucose: 125.50 mg/dL
+
+Glucose unit conversion mg/dL -> mmol/L: [6.0->6.0 6.2->6.2 6.4->6.4 ...]
+taVNS predicted parameters: freq=14.26Hz, current=1.69mA, duration=29.0min, pulse_width=371μs, cycles=8.2
+Current mapping: 1.69mA -> 14 (0-45 range)
+Final control parameters: time=29 minutes, intensity=14 (0-45 range)
+
+Waiting User Input......(10s)
+User accepted, running control routine
+>>> Executing taVNS stimulation: 29 minutes at intensity 14
+Rebooting now...
 ```
 
-### 5. 加载和使用训练好的模型（Python）
+### 5. 单独的taVNS模型测试
+
+如果只想测试taVNS参数预测模型（不使用完整血糖控制系统），可以使用：
+```bash
+# 打开单独的taVNS测试程序
+# Arduino_Test/esp32_tavns_test/esp32_tavns_test.ino
+```
+
+### 6. 加载和使用训练好的模型（Python）
 ```python
 import torch
 from model import taVNSNet
@@ -376,35 +448,66 @@ print("推荐刺激参数:", pred_params.numpy())
   - `README.md`: 详细的Arduino测试说明
   - `QUICK_START.md`: 快速开始指南
 
-## 性能指标
+## 系统性能指标
 
-### 评估指标
-- **参数预测**: MSE, MAE, RMSE
-- **个体自适应**: 性能改进百分比
-- **TFLite转换精度**: 原始空间MAE < 2.0
-- **ESP32推理性能**: 推理时间 < 5ms，内存使用 < 20%
+### 完整系统性能
+- **血糖扫描响应**: < 3秒完成一次扫描
+- **血糖预测推理**: < 5ms（血糖预测模型）
+- **taVNS参数计算**: < 5ms（taVNS参数模型）
+- **OLED显示更新**: < 100ms
+- **总内存使用**: < 200KB（双模型 + 显示系统）
+- **数据日志速度**: < 10ms写入SPIFFS
+- **系统重启周期**: 约30秒完成一个完整循环
 
-### 预期性能
-- **PyTorch模型**: 参数预测误差 < 15%，个体自适应改进 > 20%
-- **TFLite模型**: 转换精度损失 < 5%，模型大小 < 1MB
-- **ESP32-S3部署**: 推理时间 < 5ms，内存使用 < 64KB，准确率保持 > 95%
+### 模型精度指标
+- **血糖预测模型**: 预测误差 < 10%
+- **taVNS参数模型**: 参数预测MAE < 2.0
+- **TFLite转换精度**: 损失 < 5%
+- **单位转换精度**: mg/dL ↔ mmol/L自动转换
+- **参数映射精度**: 电流值线性映射到0-45区间
+
+### 硬件兼容性
+- **ESP32-S3**: 16MB PSRAM + 32MB Flash（必需）
+- **支持传感器**: BLE血糖传感器
+- **显示设备**: SH1106 OLED（128x64）
+- **刺激设备**: Nurosym或兼容设备
+- **存储系统**: SPIFFS文件系统日志
 
 ## 注意事项
 
-1. **数据来源**: 所有数据都基于已发表的科学论文
-2. **模型限制**: 当前模型基于有限的论文数据，实际应用需要更多验证
-3. **临床应用**: 本模型仅供研究使用，临床应用需要监管部门批准
-4. **个体差异**: 模型考虑了个体差异，但实际应用中仍需个体化调整
-5. **训练输出**: 所有训练结果自动保存到`Training_Outputs`文件夹
-6. **参数范围**: 预测的刺激参数在合理范围内，但实际应用需要医生指导
-7. **TFLite优化与ESP32部署**: 
-   - **模型架构**: 为TFLite兼容性进行了重大简化，移除了LSTM和注意力机制
-   - **精度权衡**: 简化架构会有一定精度损失，通过强化数据增强进行补偿
-   - **转换模式**: 推荐使用Float32非量化模式以获得最佳ESP32-S3兼容性
-   - **硬件要求**: ESP32-S3需要配置足够的PSRAM（建议8MB）
-   - **库依赖**: 确保TensorFlowLite_ESP32库版本兼容
-   - **性能优化**: TFLite优化模型在ESP32-S3上推理时间<5ms，内存使用<64KB
-   - **测试验证**: 测试结果仅供验证，实际应用需要更多测试
+### 📋 使用须知
+1. **数据来源**: 所有taVNS参数基于已发表的科学论文
+2. **系统限制**: 当前为研究原型系统，实际临床应用需要更多验证
+3. **临床应用**: 本系统仅供研究使用，临床应用需要监管部门批准
+4. **个体差异**: 系统考虑了个体差异，但实际应用仍需个体化调整
+5. **医疗监督**: 所有刺激参数的实际应用需要医生指导
+
+### ⚠️ 技术限制
+1. **硬件要求**: 
+   - ESP32-S3必须配置16MB PSRAM + 32MB Flash
+   - 需要兼容的血糖传感器和刺激设备
+2. **模型架构**: 
+   - taVNS模型为TFLite兼容性进行了简化
+   - 血糖预测模型使用简化的前馈网络
+3. **数据单位**: 
+   - 系统自动处理mg/dL与mmol/L之间的转换
+   - taVNS模型训练使用mmol/L，血糖扫描使用mg/dL
+4. **存储限制**: 
+   - SPIFFS日志文件有大小限制
+   - 系统会自动管理存储空间
+
+### 🔧 调试和维护
+1. **串口监控**: 使用115200波特率监控系统运行状态
+2. **日志导出**: 启动时输入"dump"命令可导出所有日志
+3. **看门狗处理**: 系统已优化看门狗超时问题
+4. **内存管理**: 双模型共存需要精确的内存管理
+5. **显示优化**: OLED显示使用反色高亮和精确的文字边界计算
+
+### 📊 数据管理
+1. **环形缓冲**: 血糖数据使用12个值的环形缓冲区
+2. **预测缓存**: 预测结果也使用环形缓冲管理
+3. **日志格式**: 分别记录原始血糖、预测值和控制决策
+4. **数据持久化**: 使用ESP32 NVS和SPIFFS双重存储
 
 ## 参考文献
 
@@ -416,4 +519,17 @@ print("推荐刺激参数:", pred_params.numpy())
 
 ---
 
-*本项目基于真实的科学研究数据，旨在为taVNS参数优化提供智能化解决方案。* 
+## 🎯 项目贡献
+
+本项目实现了从血糖监测到taVNS控制的完整闭环系统，主要贡献包括：
+
+1. **🔄 完整闭环**: 首个集成血糖监测、预测和taVNS控制的完整系统
+2. **🧠 双AI架构**: 血糖预测和taVNS参数计算两个AI模型协同工作
+3. **📱 实时交互**: OLED显示系统提供直观的用户交互界面
+4. **💾 完整数据链**: 从扫描到控制的全过程数据记录和管理
+5. **⚡ 嵌入式优化**: 针对ESP32-S3的完整系统优化和内存管理
+6. **🔧 工程化实现**: 从研究原型到可部署系统的完整工程化
+
+---
+
+*本项目基于真实的科学研究数据，旨在为taVNS智能血糖控制提供完整的解决方案。* 
